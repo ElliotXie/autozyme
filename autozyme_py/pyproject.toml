@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autozyme"
+version = "0.3.0"
+description = "Drop-in accelerators for scientific Python packages"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "xie227", email = "xie227@wisc.edu" }]
+keywords = ["scientific-computing", "single-cell", "performance", "monkey-patch"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "pyyaml"]
+
+[project.urls]
+Homepage = "https://github.com/ElliotXie/autozyme-framework"
+Repository = "https://github.com/ElliotXie/autozyme-framework"
+Issues = "https://github.com/ElliotXie/autozyme-framework/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# Bundle only finalized per-patch speedup snapshots so
+# `autozyme.speedups("name")` works after a plain pip install (no dev tree
+# access). Raw speedups.tsv histories stay in the framework repo and are not
+# published.
+#
+# Subpackages enumerated explicitly because setuptools >= 77 rejects bare
+# `"*"` as a key (despite its own schema claiming the predefined value is
+# allowed — see setuptools/_distutils issue). Keep in sync with the per-
+# patch dirs under src/autozyme/. New patch added? Append it here.
+autozyme = ["scanpy_*/speedups_finalized.tsv"]
+"autozyme.astropy_boxleastsquares" = ["speedups_finalized.tsv"]
+"autozyme.cell2location"          = ["speedups_finalized.tsv"]
+"autozyme.cellphonedb"            = ["speedups_finalized.tsv"]
+"autozyme.dipy"                   = ["speedups_finalized.tsv"]
+"autozyme.fipy"                   = ["speedups_finalized.tsv"]
+"autozyme.lifelines"              = ["speedups_finalized.tsv"]
+"autozyme.mdanalysis_rmsd"        = ["speedups_finalized.tsv"]
+"autozyme.obspy"                  = ["speedups_finalized.tsv"]
+"autozyme.prody"                  = ["speedups_finalized.tsv"]
+"autozyme.sarsen"                 = ["speedups_finalized.tsv"]
+"autozyme.sccoda"                 = ["speedups_finalized.tsv"]
+"autozyme.scvelo"                 = ["speedups_finalized.tsv"]
+"autozyme.squidpy_cooccurrence"   = ["speedups_finalized.tsv"]
+"autozyme.statsmodels"            = ["speedups_finalized.tsv"]
+"autozyme.xclim"                  = ["speedups_finalized.tsv"]
+"autozyme.scanpy"                 = ["manifest.yml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# pre-push hook — run the fresh-user harness before anything reaches the remote.
+#
+# Why: this repo is pushed DIRECTLY to main, so GitHub branch protection (which
+# only gates PR *merges*) can't stop a bad commit — by the time CI goes red it's
+# already on main and, as the VENGEANCE build break showed, the red gets ignored.
+# Catching it here, before the push, is the workflow-compatible equivalent of
+# "red CI blocks merge".
+#
+# Install (repo-local, one time):
+#     git config core.hooksPath scripts/hooks
+#
+# Bypass for an emergency push:
+#     SKIP_FRESH_CHECK=1 git push ...
+#   or the standard:  git push --no-verify ...
+set -uo pipefail
+
+if [ "${SKIP_FRESH_CHECK:-}" = "1" ]; then
+  echo "[pre-push] SKIP_FRESH_CHECK=1 — skipping fresh-user harness." >&2
+  exit 0
+fi
+
+ROOT="$(git rev-parse --show-toplevel)"
+CHECK="$ROOT/scripts/fresh_user_check.sh"
+if [ ! -x "$CHECK" ]; then
+  echo "[pre-push] $CHECK not found/executable — skipping (nothing to enforce)." >&2
+  exit 0
+fi
+
+echo "[pre-push] running fresh-user harness (set SKIP_FRESH_CHECK=1 to bypass)..." >&2
+if bash "$CHECK" "$ROOT"; then
+  exit 0
+else
+  echo "[pre-push] fresh-user harness FAILED — push blocked. Fix, or bypass with SKIP_FRESH_CHECK=1." >&2
+  exit 1
+fi

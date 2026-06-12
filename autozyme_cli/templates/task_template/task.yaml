@@ -1,0 +1,31 @@
+task: <TASK_NAME>
+target_repo: <TARGET_REPO_URL_OR_LOCAL_PATH>
+target_function: <PKG::FUNC>            # e.g. spacexr::run.RCTD, scanpy.tl.rank_genes_groups
+signature: <CALL_SIGNATURE>             # e.g. run.RCTD(RCTD, doublet_mode = "doublet"); init agent fills
+
+datasets:
+  - {tier: small,   name: <DATASET_NAME>, path: <PATH>}
+  - {tier: medium, name: <DATASET_NAME>, path: <PATH>}
+  - {tier: large,  name: <DATASET_NAME>, path: <PATH>}
+  # Optional `params:` per entry — tier-specific values read by
+  # `get_tier_params()` from `autozyme_cli/zyme/helpers.{py,R}`. Use when
+  # tiers share one input file with per-tier subsampling.
+
+metrics:
+  - {name: <METRIC>, threshold: <FLOAT>, comparator: gte}  # <ONE-LINE REASON: why this metric, why this threshold>
+  - {name: <METRIC>, threshold: <FLOAT>, comparator: lte}  # <ONE-LINE REASON>
+
+# Thread points to maintain baselines at. Each (tier, thread) pair gets its
+# own baseline row in results.tsv; verify cells at thread=K compare against
+# the (tier, K) baseline. Default `[1]` is single-threaded only — typical
+# for newly-init'd tasks. Audit / fairness retrofit grows this to e.g.
+# `[1, 4, 8]` so verify's threading sweep has a same-thread baseline at
+# each cell. Use `zyme baseline-rebench --threads 1,4,8` to populate.
+baseline_threads: [1]
+
+# Optional fields the init / iterate agents may add later:
+#   executor: {python: <conda_env_or_path>}      # non-default interpreter
+#   algorithm_class: stochastic                  # default omitted = deterministic
+#   random_seeds: {primary: 42, noise_calibration: [43, 44, 45]}
+#   intrinsic_noise: ...                         # auto-populated by `zyme baseline noise`
+#   upstream_parallelism: [...]                  # parallel/thread knobs upstream exposes (init step 4b)

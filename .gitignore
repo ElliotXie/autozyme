@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+*.egg
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+
+# Node
+node_modules/
+dist/
+.wrangler/
+
+# Data (hosted on HuggingFace)
+datasets/**/*.rds
+datasets/**/*.h5ad
+datasets/**/*.h5
+datasets/**/*.mtx
+datasets/**/*.gz
+datasets/_raw/
+
+# Task runtime (gitignored per-task, but also here for safety)
+*.rds
+*.h5ad
+reference_outputs/
+artifacts/
+.zyme/
+memory/
+results.tsv
+verify.tsv
+profile_history/
+Rprof.out
+
+# Internal QA harness + test-run logs (never published; committed by the
+# fresh_user_check / smoke flow, not by the release sync)
+test_mac/
+test_windows/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Env
+.env
+.env.local

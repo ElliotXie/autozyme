@@ -1,0 +1,53 @@
+Package: autozyme
+Type: Package
+Title: Drop-in Accelerators for Scientific R Packages
+Version: 0.3.0
+Authors@R: person(given = "Elliot", family = "Xie",
+    role = c("aut", "cre"), email = "xie227@wisc.edu")
+Author: Elliot Xie [aut, cre]
+Maintainer: Elliot Xie <xie227@wisc.edu>
+Description: A registry of validated, monkey-patched fast replacements for hot
+ functions in scientific R packages (Seurat, nichenetr, slingshot, etc.).
+ Patches are auto-injected on package load when the corresponding upstream
+ is installed, and can be toggled per-call (zyme = FALSE), per-package
+ (deactivate("name")), or globally (deactivate_all() / AUTOZYME_DISABLED env var).
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends: R (>= 4.0.0)
+Imports: utils,
+    methods,
+    Rcpp,
+    RcppParallel,
+    data.table
+LinkingTo: Rcpp,
+    RcppParallel,
+    RcppArmadillo,
+    BH,
+    RcppEigen,
+    RcppAnnoy,
+    RcppDist
+SystemRequirements: GNU make
+Suggests: testthat (>= 3.0.0),
+ RhpcBLASctl,
+ yaml,
+ future,
+ future.apply,
+ nichenetr,
+ caTools,
+ dplyr,
+ RcppHNSW,
+ Seurat,
+ SeuratObject,
+ Matrix,
+ uwot,
+ reticulate,
+ sctransform,
+ glmGamPoi,
+ withr,
+ parallelDist,
+ pbapply,
+ dbscan,
+ SingleCellExperiment,
+ scater
+Config/testthat/edition: 3
+RoxygenNote: 7.3.0

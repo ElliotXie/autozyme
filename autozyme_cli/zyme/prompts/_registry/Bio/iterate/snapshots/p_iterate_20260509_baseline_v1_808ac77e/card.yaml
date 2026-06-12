@@ -1,0 +1,16 @@
+id: p_iterate_20260509_baseline_v1_808ac77e
+slot: iterate
+field: Bio
+source_path: autozyme_cli/zyme/prompts/Bio/2_iterate.md
+parent: null
+content_sha256: 808ac77e2b766d5c40c1ca111648e46b97d892d885f36e00184b59ff9a2b6947
+name: baseline_v1
+created_at: "2026-05-09T13:20:12"
+hypothesis: |
+  current live as of 2026-05-09; supersedes prior 2026-05-08 baseline_v1 snapshot
+labels:
+  aggressiveness: 5.0
+  native_reach: 4.0
+  rerun_budget: 5.0
+  thread_breadth: 5.0
+notes: ""

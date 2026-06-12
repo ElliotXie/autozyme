@@ -1,0 +1,23 @@
+# Synthetic ground-truth fixture for `zyme profile` parser/ranking validation.
+#
+# This is NOT a real autozyme optimization task — it lives under
+# autozyme_cli/tests/fixtures/ as a TEST RESOURCE. Its only job: produce
+# three CPU-bound functions with known relative work shares (~50% / ~30% /
+# ~20%) so we can verify each profile backend ranks them consistently.
+#
+# Used by: tests/bench_profile.py (FIXTURES list)
+# Manual run: zyme profile --backend <X> --task-dir <this dir> --dataset tiny
+
+task: synthetic_groundtruth
+target_repo: (none — synthetic test fixture)
+target_function: pipeline.run.cpu_a
+signature: cpu_a()  # no real signature, three pure-Python work functions
+
+datasets:
+  - {tier: tiny, name: synth_tiny, path: ./data/tiny.json}
+
+# Threading not relevant — pure single-threaded Python loops.
+threading: not_applicable
+
+# No special interpreter — uses whatever python `zyme profile` defaults to
+# (the same one running the CLI). Override via executor.python if needed.

@@ -1,0 +1,1 @@
+{"matmul_n": 1200, "matmul_reps": 4, "matmul_min_s": 8.0, "fft_n": 2097152, "sort_n": 1800000}

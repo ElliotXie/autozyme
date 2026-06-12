@@ -1,0 +1,11 @@
+id: iterate_test_wgcna_blockwise_real
+stage: iterate
+prompt_slot: iterate
+field: Bio
+description: Single-task Bio iterate benchmark for WGCNA::blockwiseModules (block-wise hierarchical clustering + TOM; mixed R/native hotspot).
+default_reps: 1
+
+tasks:
+  - id: test_wgcna_blockwise_real
+    template: test_wgcna_blockwise_real
+    probe: native_reach

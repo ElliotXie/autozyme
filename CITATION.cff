@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use AutoZyme, please cite it as below."
+title: "AutoZyme: Autonomous CPU-side acceleration of scientific computing software"
+type: software
+version: 0.3.0
+authors:
+  - given-names: Elliot
+    family-names: Xie
+    affiliation: "University of Wisconsin-Madison"
+  - given-names: Lingxin
+    family-names: Cheng
+    affiliation: "University of Wisconsin-Madison"
+  - given-names: Yujia
+    family-names: Cai
+    affiliation: "University of Wisconsin-Madison"
+  - given-names: Jack
+    family-names: Shireman
+    affiliation: "University of Wisconsin-Madison"
+  - given-names: Christina
+    family-names: Kendziorski
+    affiliation: "University of Wisconsin-Madison"
+repository-code: "https://github.com/ElliotXie/autozyme"
+url: "https://www.autozyme.com"
+license: MIT
+keywords:
+  - bioinformatics
+  - single-cell
+  - scientific-computing
+  - performance-optimization
+  - llm-agents

@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+"""Standalone entry point — works when bin/ is on PATH or invoked with full path.
+
+Adjusts sys.path so `from zyme.cli import main` resolves to the package
+sibling-of-bin, regardless of cwd.
+"""
+import os
+import sys
+
+_BIN = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(_BIN)
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
+from zyme.cli import main
+
+main()

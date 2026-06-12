@@ -1,0 +1,343 @@
+name: Tier A — framework self-check
+
+# Tier A runs on every PR + push to main. ~3-5 min. Job: verify the framework
+# packages install, register, and pass their own unit tests on every supported
+# Python / R combination. Does NOT exercise any patch against a real upstream.
+# That's Tier B's job (scheduled, opt-in).
+
+on:
+  pull_request:
+    paths:
+      - "autozyme_py/**"
+      - "autozyme_r/**"
+      - "autozyme_cli/**"
+      - "scripts/check_versions.py"
+      - ".github/scripts/ci_check_coverage.py"
+      - ".github/scripts/ci_check_coverage.R"
+      - ".github/scripts/ci_matrix.py"
+      - ".github/workflows/tier-a-pr.yml"
+  push:
+    branches: [main]
+    paths:
+      - "autozyme_py/**"
+      - "autozyme_r/**"
+      - "autozyme_cli/**"
+      - "scripts/check_versions.py"
+      - ".github/scripts/ci_check_coverage.py"
+      - ".github/scripts/ci_check_coverage.R"
+      - ".github/scripts/ci_matrix.py"
+      - ".github/workflows/tier-a-pr.yml"
+
+jobs:
+  py-framework:
+    if: vars.CI_ENABLED == 'true'
+    runs-on: ${{ matrix.os }}
+    name: py-framework (${{ matrix.os }} / py${{ matrix.python-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Boundary-only Python sweep: oldest supported (3.10, the floor in
+        # pyproject) + latest (3.12). Skipping 3.11 in the middle — bugs that
+        # pass both endpoints almost never break the middle. The codebase is
+        # numba/numpy-heavy with little version-sensitive syntax, so the
+        # middle version's marginal coverage isn't worth the CI minutes.
+        # Windows/macOS only run latest; codec/BLAS/spawn quirks don't depend
+        # on the Python minor version.
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.12"]
+        exclude:
+          - { os: windows-latest, python-version: "3.10" }
+          - { os: macos-latest,   python-version: "3.10" }
+    steps:
+      - uses: actions/checkout@v5
+
+      # Lint the workflow YAML before doing anything else -- catches yaml
+      # typos, undefined vars, wrong `if:` syntax, missing checkout step.
+      # Fast (~3s) and saves a full matrix re-run when someone fat-fingers
+      # a workflow change. Linux-only because actionlint binary is heavier
+      # to fetch on Win/macOS and the syntax it checks is OS-agnostic.
+      - name: Lint workflow files (actionlint)
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        shell: bash
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # tomllib is stdlib from 3.11; check_versions.py + ci_matrix.py both
+      # need a stdin parser on 3.10. Install tomli as a marker-gated extra.
+      - name: Install build/tooling
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m pip install "tomli; python_version<'3.11'" packaging
+
+      - name: Check py/R version sync
+        run: python scripts/check_versions.py
+
+      - name: Validate ci_matrix.py works
+        shell: bash
+        run: |
+          python .github/scripts/ci_matrix.py --tier=B --pretty > /dev/null
+          python .github/scripts/ci_matrix.py --tier=C --pretty > /dev/null
+
+      - name: Install package + dev extras
+        working-directory: autozyme_py
+        run: pip install -e ".[dev]"
+
+      - name: Coverage drift check (every patch has a contract test)
+        # Catches the silent-regression class: a new patch is added but its
+        # per-API test_<name>.py file is forgotten. Also fires when a patch
+        # is removed but the test file lingers. Both are easy to miss in a
+        # code review of a multi-file PR.
+        run: python .github/scripts/ci_check_coverage.py
+
+      - name: Run unit tests
+        working-directory: autozyme_py
+        # Most plugin smoke tests pytest.importorskip on their upstream and
+        # cleanly skip when the heavy upstream isn't installed. Framework
+        # tests (test_core, test_manifest, test_auto_threads) run for real.
+        run: pytest -q
+
+      - name: Build sdist + wheel
+        working-directory: autozyme_py
+        run: python -m build
+
+      - name: Check distribution metadata
+        working-directory: autozyme_py
+        run: twine check dist/*
+
+      - name: Install built wheel in clean venv and import-smoke
+        working-directory: autozyme_py
+        # `pip install -e .[dev]` (above) tests the editable install path
+        # that maintainers use. Real users do `pip install autozyme` and
+        # get the WHEEL — different packaging code path (package_data,
+        # entry_points, extras resolution). This step catches the bug
+        # where the wheel is broken but editable works (or vice versa).
+        # Cross-OS: venv layout differs (Windows: Scripts/, Unix: bin/).
+        shell: bash
+        run: |
+          # $RUNNER_TEMP works on Linux/Win/macOS runners (no /tmp on Win).
+          VENV="${RUNNER_TEMP}/clean-venv"
+          python -m venv "$VENV"
+          if [ -x "$VENV/bin/python" ]; then
+            PY="$VENV/bin/python"
+          else
+            PY="$VENV/Scripts/python.exe"
+          fi
+          WHEELS=(dist/*.whl)
+          WHEEL="${WHEELS[0]}"
+          "$PY" -m pip install --quiet --upgrade pip
+          "$PY" -m pip install --quiet "$WHEEL"
+          "$PY" -c "
+          import autozyme
+          patches = autozyme.list_patches()
+          assert len(patches) > 0, f'no patches registered after wheel install'
+          print(f'wheel-install smoke OK: {len(patches)} patches discovered')
+          "
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.python-version == '3.12'
+        with:
+          name: autozyme-py-dist
+          path: autozyme_py/dist/*
+          retention-days: 14
+
+  r-framework:
+    if: vars.CI_ENABLED == 'true'
+    runs-on: ${{ matrix.os }}
+    name: r-framework (${{ matrix.os }})
+    defaults:
+      run:
+        working-directory: autozyme_r
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows R surfaces fork-only / Makevars / file.path() bugs the
+        # Unix runners miss. autozyme_r is a documented cross-platform
+        # target, so the Windows runner is mandatory, not optional.
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      R_KEEP_PKG_SOURCE: yes
+      _R_CHECK_FORCE_SUGGESTS_: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install py-side tooling (check_versions uses tomllib)
+        working-directory: .
+        run: python -m pip install --upgrade pip
+
+      - name: Check py/R version sync
+        working-directory: .
+        run: python scripts/check_versions.py
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+          use-public-rspm: true
+
+      - name: Install Linux R system deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libuv1-dev
+
+      - name: Install R framework deps
+        shell: Rscript {0}
+        working-directory: .
+        run: |
+          rspm <- Sys.getenv("RSPM")
+          if (nzchar(rspm)) {
+            options(repos = c(CRAN = rspm))
+          } else {
+            options(repos = c(CRAN = "https://cloud.r-project.org"))
+          }
+          Sys.setenv(USE_BUNDLED_LIBUV = "1")
+          pkgs <- c(
+            "BH",
+            "data.table",
+            "pkgload",
+            "Rcpp",
+            "RcppAnnoy",
+            "RcppArmadillo",
+            "RcppDist",
+            "RcppEigen",
+            "RcppParallel",
+            "RhpcBLASctl",
+            "testthat",
+            "yaml"
+          )
+          missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
+          if (length(missing)) {
+            install.packages(
+              missing,
+              dependencies = c("Depends", "Imports", "LinkingTo")
+            )
+          }
+          missing_after <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
+          if (length(missing_after)) {
+            stop("R framework dependency install failed: ",
+                 paste(missing_after, collapse = ", "))
+          }
+
+      - name: Coverage drift check (every patch has a contract test)
+        working-directory: .
+        # R-side mirror of the py coverage check. Same intent: catch
+        # patches added without a test-contract-<name>.R, and stale tests
+        # for removed patches.
+        run: Rscript .github/scripts/ci_check_coverage.R
+
+      - name: R CMD check
+        working-directory: .
+        shell: bash
+        run: R CMD check autozyme_r --no-manual --no-tests
+
+      - name: Install R package
+        working-directory: .
+        shell: bash
+        run: R CMD INSTALL autozyme_r
+
+      - name: R package smoke
+        working-directory: .
+        shell: bash
+        run: |
+          Rscript -e "library(autozyme); stopifnot(length(list_patches()) > 0); cat('R package smoke OK\n')"
+
+      - name: Run R direct smoke
+        working-directory: .
+        shell: bash
+        run: |
+          Rscript - <<'RSCRIPT'
+          library(autozyme)
+
+          patches <- list_patches()
+          stopifnot(length(patches) > 0)
+
+          set_threads(2L)
+          stopifnot(Sys.getenv("OMP_NUM_THREADS") == "2")
+          n <- auto_threads(cap = 2L)
+          stopifnot(is.integer(n), n >= 1L)
+
+          first_speedups <- speedups(patches[[1]])
+          stopifnot(is.data.frame(first_speedups))
+
+          original_file_ext <- tools::file_ext
+          fast_file_ext <- function(x) paste0(original_file_ext(x), "_fast")
+          register_patch("ci_tools_demo", "tools", list(file_ext = fast_file_ext))
+          on.exit({
+            try(restore("ci_tools_demo"), silent = TRUE)
+            if (exists("ci_tools_demo", envir = autozyme:::.zyme_registry)) {
+              rm("ci_tools_demo", envir = autozyme:::.zyme_registry)
+            }
+          }, add = TRUE)
+
+          stopifnot(isTRUE(activate("ci_tools_demo")))
+          stopifnot(identical(tools::file_ext("foo.R"), "R_fast"))
+          restore("ci_tools_demo")
+          stopifnot(identical(tools::file_ext("foo.R"), "R"))
+
+          cat("R direct smoke OK:", length(patches), "patches\n")
+          RSCRIPT
+
+  cli-framework:
+    if: vars.CI_ENABLED == 'true'
+    runs-on: ${{ matrix.os }}
+    name: cli-framework (${{ matrix.os }} / py${{ matrix.python-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Boundary-only Python sweep (3.10 floor + 3.12 latest), same logic
+        # as py-framework. The zyme CLI is the surface that exposed the
+        # cp1252 UnicodeEncodeError class on Windows. macOS catches Apple-
+        # specific subprocess + stdio quirks the locale-hostile smoke tests.
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.12"]
+        exclude:
+          - { os: windows-latest, python-version: "3.10" }
+          - { os: macos-latest,   python-version: "3.10" }
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install autozyme-cli + dev extras
+        working-directory: autozyme_cli
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run CLI unit + smoke tests
+        working-directory: autozyme_cli
+        shell: bash
+        # tests/smoke/test_locale_hostile.py reproduces the May 2026
+        # Windows cp1252 arrow crash via subprocess regardless of host
+        # encoding — runs on every OS in the matrix.
+        run: |
+          pytest -q \
+            tests/dispatch/test_events.py \
+            tests/dispatch/test_master_rounds.py \
+            tests/dispatch/test_state.py \
+            tests/dispatch/test_usage.py \
+            tests/parsers \
+            tests/smoke \
+            tests/test_attest_publish.py \
+            tests/test_cli_smoke.py \
+            tests/test_package_check_versions.py \
+            tests/test_package_lint.py \
+            tests/test_package_smoke.py \
+            tests/test_package_sync_manifests.py \
+            tests/test_scan.py \
+            tests/test_scan_portability.py \
+            tests/test_sync_prompts.py \
+            tests/test_sync_prompts_to_tasks.py

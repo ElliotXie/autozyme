@@ -1,0 +1,15 @@
+# Lightweight NumPy native-kernel fixture for `zyme profile`.
+#
+# Complements alloc_heavy_synthetic: this fixture is not memory-heavy, but it
+# reliably enters LAPACK/FFT/sort native kernels that cProfile cannot see
+# through. Used to keep native backend coverage fast.
+
+task: numpy_native_synthetic
+target_repo: (none — synthetic test fixture)
+target_function: pipeline.run.matmul_kernel
+signature: matmul_kernel(n, min_reps, min_wall_s)
+
+datasets:
+  - {tier: tiny, name: numpy_native_tiny, path: ./data/tiny.json}
+
+threading: native_numpy

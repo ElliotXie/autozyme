@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autozyme-cli"
+version = "0.1.0"
+description = "CLI driver for the autozyme optimization loop"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "xie227", email = "xie227@wisc.edu" }]
+keywords = ["scientific-computing", "performance", "iteration-loop"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "PyYAML>=6",
+]
+
+[project.optional-dependencies]
+# Install with `pip install -e autozyme_cli[plot]` to enable `zyme verify` PNG
+# rendering and `zyme plot`. Without it, verify falls back to plain-text.
+plot = [
+    "matplotlib>=3.5",
+]
+dev = [
+    "pytest>=7",
+]
+profile = [
+    "scalene>=1.5",
+    "memray>=1.10; sys_platform != 'win32'",
+]
+
+[project.scripts]
+zyme = "zyme.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+# Tests must import from the installed `zyme` package, not bare files.
+# `pip install -e autozyme_cli[dev]` (or `pip install -e .`) puts zyme on
+# sys.path automatically.
+addopts = ["-ra", "--strict-markers"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["zyme*"]
+
+# Ship prompts/, templates/, and helpers.{R,py} inside the wheel. They live
+# under zyme/ so importlib.resources.files("zyme") / "prompts" works for
+# PyPI users. Tasks source helpers.{R,py} directly from zyme/ (the old
+# parent-level symlinks have been removed). The remaining
+# autozyme_cli/{prompts,templates} symlinks are dev-only conveniences for
+# shell/IDE navigation; nothing at runtime relies on them.
+[tool.setuptools.package-data]
+zyme = [
+    "prompts/**/*.md",
+    "prompts/**/*.py",
+    "templates/**/*",
+    "helpers.R",
+    "helpers.py",
+]

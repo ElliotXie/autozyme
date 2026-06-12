@@ -1,0 +1,21 @@
+# Allocation-heavy synthetic fixture for `zyme profile` mem-backend validation.
+#
+# Three NumPy-allocation functions with controlled relative allocation
+# magnitudes:
+#   alloc_big    — single large 2D array (~800MB)
+#   alloc_medium — many medium 1D arrays (~300MB cumulative, lots of churn)
+#   alloc_small  — small dict-of-arrays (~100MB)
+#
+# Goal: verify memray (mem backend) ranks alloc_big highest, sees the
+# native NumPy buffers (not just Python wrappers), and surfaces all three
+# distinct call sites. Also verifies Scalene (full) memory column populates.
+
+task: alloc_heavy_synthetic
+target_repo: (none — synthetic test fixture)
+target_function: pipeline.run.alloc_big
+signature: alloc_big(n)
+
+datasets:
+  - {tier: tiny, name: alloc_synth_tiny, path: ./data/tiny.json}
+
+threading: not_applicable

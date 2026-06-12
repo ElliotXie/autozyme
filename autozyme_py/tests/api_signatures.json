@@ -1,0 +1,20 @@
+{
+  "activate": "(name) -> 'bool | dict[str, bool]'",
+  "auto_threads": "(cap: 'int | None' = None) -> 'int'",
+  "benchmark": "(name: 'str', task_dir: 'str', tier: 'str' = 'tiny', reps: 'int' = 3, verbose: 'bool' = True) -> 'dict[str, Any]'",
+  "disabled": "()",
+  "env_snapshot": "() -> 'dict[str, Any]'",
+  "inspect": "(name: 'str') -> 'dict[str, Any]'",
+  "is_disabled": "() -> 'bool'",
+  "list_patches": "(installed: 'bool' = False) -> 'list[str]'",
+  "list_subsets": "() -> 'list[str]'",
+  "register_patch": "(name: 'str', targets: 'list[tuple[str, str, Callable]]', smoke: 'dict[str, Callable] | None' = None, tested_against: 'str | None' = None, tested_upstream_versions: 'dict[str, list[str]] | None' = None) -> 'None'",
+  "resolve_dataset_path": "(task_dir: 'str', raw_path: 'str') -> 'str'",
+  "deactivate": "(name) -> 'None'",
+  "deactivate_all": "() -> 'None'",
+  "set_threads": "(n: 'int') -> 'int'",
+  "speedups": "(name: 'str', history: 'bool' = False) -> 'list[dict[str, Any]]'",
+  "status": "() -> 'dict[str, str]'",
+  "subset": "(name: 'str') -> 'list[str]'",
+  "verify_patch": "(name: 'str', task_dir: 'str', tiers: 'tuple[str, ...]' = ('tiny', 'medium', 'large', 'ood_large', 'ood_xlarge'), reps: 'int' = 2, verbose: 'bool' = True, *, use_baseline_cache: 'bool' = True, baseline_confirm_sigma: 'float' = 3.0, no_baseline_confirm: 'bool' = False) -> 'list[dict[str, Any]]'"
+}

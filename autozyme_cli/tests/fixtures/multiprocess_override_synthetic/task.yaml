@@ -1,0 +1,16 @@
+# Synthetic fixture for Python multiprocessing override aggregation.
+#
+# The profiler backends often see only parent-side pool wait/IPC frames for
+# short worker tasks. This fixture pins the deterministic side-channel:
+# install_override timing lines emitted from worker PIDs must aggregate into
+# override_summary and actionable_hotspots.
+
+task: multiprocess_override_synthetic
+target_repo: (none — synthetic test fixture)
+target_function: worker_target.worker_payload
+signature: worker_payload(n)
+
+datasets:
+  - {tier: tiny, name: mp_override_tiny, path: ./data/tiny.json}
+
+threading: multiprocessing_fork

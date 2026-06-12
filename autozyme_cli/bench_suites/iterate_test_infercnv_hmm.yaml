@@ -1,0 +1,11 @@
+id: iterate_test_infercnv_hmm
+stage: iterate
+prompt_slot: iterate
+field: Bio
+description: Single-task Bio iterate benchmark for infercnv:::predict_CNV_via_HMM_on_tumor_subclusters (HMM Viterbi over chrs × subclusters; serial R hotspot).
+default_reps: 1
+
+tasks:
+  - id: test_infercnv_hmm
+    template: test_infercnv_hmm
+    probe: native_reach

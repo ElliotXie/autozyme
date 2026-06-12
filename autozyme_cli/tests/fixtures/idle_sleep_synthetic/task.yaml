@@ -1,0 +1,15 @@
+# Synthetic fixture for native idle/wait filtering.
+#
+# The process intentionally sleeps inside with_profile(). Native sampling
+# should classify wait/syscall frames as idle notes instead of actionable
+# hotspots.
+
+task: idle_sleep_synthetic
+target_repo: (none — synthetic test fixture)
+target_function: time.sleep
+signature: sleep(seconds)
+
+datasets:
+  - {tier: tiny, name: idle_sleep_tiny, path: ./data/tiny.json}
+
+threading: not_applicable
