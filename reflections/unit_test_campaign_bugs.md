@@ -35,8 +35,34 @@ The following were fixed in source (smallest-correct change) and their pin tests
 - **B19** profile/parsers `_split_memray_location` keeps a Windows drive-letter colon in the file
   part (split func off the left, line off the right).
 
-STILL OPEN (real bugs, pinned, awaiting maintainer decision): B1, B3, B12, B13, B14, B21, B22
-(see their entries below).
+STILL OPEN (real bugs, pinned, awaiting maintainer decision): B1, B21 (see entries below).
+
+## UPDATE 2026-06-14 (round 2) — investigated the 7 "critical" bugs, fixed 4
+A parallel deep investigation confirmed each with a real repro and checked every one against the
+finalized speedups.tsv. KEY FINDING: NONE of the 7 affect any published speedup or output-
+equivalence number (the buggy paths are all non-benchmarked or non-numeric tooling). Actions:
+- **B13** mdanalysis weighted RMSD: FIXED. Both einsum sites (`__init__.py:252` DCD-bulk and `:295`
+  non-bulk) changed from `"cij,j->ci"` to `"cij,i->cj"` (contract the atom axis). Weighted RMSD no
+  longer crashes and now matches vanilla; the two strict-xfail tests were converted to real parity
+  tests. Unweighted (benchmarked) path is untouched. No speedup/numeric change.
+- **B22** fipy source-term crash: FIXED. `fast_binary_buildAndAddMatrices` now only writes the
+  binary cache when `tmpRHSvector_diff_for_cache is not None`, so an out-of-scope
+  `transient == diffusion + source` equation falls back to the full upstream path instead of
+  crashing on the 2nd solve. The xfail test became a parity test. RUN-VERIFIED in the scanpy310
+  conda env (fipy 4.0.2, the version the patch targets): the source-term equation now falls back
+  and its result matches vanilla. (On the base anaconda env fipy's editable install target was
+  removed, so its tests skip there.)
+- **B14** check_intercept ignored executor.python: FIXED. `_resolve_python_for` passes
+  `task_dir / "task.yaml"` (the file) to parse_executor instead of the directory, so a declared
+  custom interpreter is honored on the attest preflight path. Pin test flipped.
+- **B3** scan_parallelism path priority: FIXED. `_path_priority` set check now uses lowercase `"r"`
+  (rel_path is already lowercased), so R/ source ranks production (0) again. Pin test flipped.
+- **B12** FindAllMarkers Wilcoxon: INVESTIGATED, NOT A BUG. The kernel is bit-exact to presto
+  (vanilla Seurat's default Wilcoxon backend): 300-trial fuzz, end-to-end, and a forced tie-trigger
+  all show max p-value diff = 0 vs vanilla Seurat. The "missing" t^3-t term on the final tie run
+  matches presto's convention; the ~1e-3 gap is only vs base-R wilcox.test/textbook, which Seurat
+  does not use. Changing the code would BREAK parity with the very baseline the project claims
+  faithfulness to. Left as-is intentionally. (test-cpp-markers.R already pins this at tol 5e-3.)
 
 ## CRITICAL — stale `restore()` references (FIXED in test/CI files)
 

@@ -178,21 +178,16 @@ def test_fast_read_next_timestep_inplace_iteration_matches_baseline(dcd_file):
         np.testing.assert_allclose(pb, pf, rtol=1e-5, atol=1e-5)
 
 
-@pytest.mark.xfail(
-    reason="SUSPECTED BUG (2nd site of B13): fast_compute's DCD BULK weighted "
-    "center-of-mass branch (line 252) uses np.einsum('cij,j->ci', buf, w), "
-    "contracting the size-3 coordinate axis with w (length n_atoms) -> broadcast "
-    "ValueError. It should be 'cij,i->cj' (contract atom axis i). The wave-2 B13 "
-    "xfail pins the NON-bulk (MemoryReader) fallback at line 295; this is the "
-    "DISTINCT bulk-path site, reached only with a real DCDReader. Documented, "
-    "not fixed (tests-only campaign).",
-    raises=ValueError,
-    strict=True,
-)
-def test_dcd_bulk_weighted_path_is_broken(dcd_file):
-    """weights='mass' over the DCD bulk path should match the baseline but
-    currently raises the same wrong-einsum ValueError as B13."""
+def test_dcd_bulk_weighted_matches_vanilla(dcd_file):
+    """weights='mass' over the DCD bulk path matches the baseline. B13 fix:
+    fast_compute's bulk path (line 252) now uses np.einsum('cij,i->cj', ...)
+    (contract the atom axis), so the weighted DCD-bulk RMSD no longer raises."""
     autozyme.activate("mdanalysis_rmsd")
+    u, ref = _make_dcd_universe(dcd_file), _make_dcd_universe(dcd_file)
+    fast = rms.RMSD(u, ref, select="all", weights="mass",
+                    ref_frame=0).run().results.rmsd.copy()
     with autozyme.disabled():
-        u, ref = _make_dcd_universe(dcd_file), _make_dcd_universe(dcd_file)
-    rms.RMSD(u, ref, select="all", weights="mass", ref_frame=0).run()
+        u2, ref2 = _make_dcd_universe(dcd_file), _make_dcd_universe(dcd_file)
+        van = rms.RMSD(u2, ref2, select="all", weights="mass",
+                       ref_frame=0).run().results.rmsd.copy()
+    np.testing.assert_allclose(fast, van, rtol=1e-5, atol=1e-6)

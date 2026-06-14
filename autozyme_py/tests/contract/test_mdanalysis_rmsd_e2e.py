@@ -81,20 +81,10 @@ def test_start_offset_run_delegates(traj):
                                rtol=1e-6, atol=1e-6)
 
 
-@pytest.mark.xfail(
-    reason="SUSPECTED BUG: fast_compute's weighted center-of-mass branch uses "
-    "np.einsum('cij,j->ci', buf, w) which contracts the size-3 coordinate axis "
-    "with w (length n_atoms), raising a broadcast ValueError. It should be "
-    "'cij,i->cj' (contract the atom axis i). fast_single_frame uses the correct "
-    "np.dot(w, buf). Weighted RMSD on the full in-order (non-DCD-bulk) path is "
-    "therefore broken; the benchmark only ran unweighted backbone RMSD so it "
-    "never tripped. Documented, not fixed (tests-only campaign).",
-    raises=ValueError,
-    strict=True,
-)
 def test_weighted_com_path_matches_vanilla(traj):
-    """weights='mass' should take the weighted center-of-mass branch in both
-    fast_single_frame and fast_compute -- currently raises in fast_compute."""
+    """weights='mass' takes the weighted center-of-mass branch in both
+    fast_single_frame and fast_compute. B13 fix: fast_compute now uses
+    np.einsum('cij,i->cj', ...) (contract the atom axis), matching vanilla."""
     autozyme.activate("mdanalysis_rmsd")
     u, ref = _universe(traj), _universe(traj[0:1])
     fast = rms.RMSD(u, ref, select="name CA", weights="mass",

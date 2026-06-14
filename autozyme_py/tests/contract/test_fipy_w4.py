@@ -229,39 +229,31 @@ def test_nonuniform_mesh_vector_mass_path():
 # documented target (DiffusionTerm(coeff=const), no source), but it should fall
 # back gracefully rather than raise.
 # --------------------------------------------------------------------------
-@pytest.mark.xfail(reason="fast_binary_buildAndAddMatrices cache-hit assumes a "
-                          "non-None diffusion RHS; a transient==diffusion+source "
-                          "3-term equation crashes with None+float — suspected bug",
-                   strict=True, raises=TypeError)
-def test_source_term_equation_crashes_on_cache_hit():
-    """Documents the suspected bug: with the patch active, a transient diffusion
-    equation carrying a constant volumetric source crashes on the 2nd solve
-    (cache hit), whereas the disabled path solves it fine."""
+def test_source_term_equation_falls_back_and_matches_vanilla():
+    """B22 fix: a transient diffusion equation carrying a constant volumetric
+    source (transient == diffusion + source) is out of the patch's documented
+    scope; the patch no longer caches an unusable None diffusion-RHS, so the 2nd
+    solve falls back to the full upstream path instead of crashing with
+    None+float. Result must match the disabled/vanilla solve."""
     import fipy as fp
+
+    def _solve():
+        mesh = fp.Grid1D(nx=12)
+        var = fp.CellVariable(name="phi", mesh=mesh, value=0.0)
+        var.constrain(1.0, mesh.facesLeft)
+        var.constrain(0.0, mesh.facesRight)
+        eqn = fp.TransientTerm() == fp.DiffusionTerm(coeff=1.0) + 5.0
+        for _ in range(3):  # >1 solve so the (skipped) cache-hit path is exercised
+            eqn.solve(var=var, dt=0.5)
+        return np.asarray(var.value, dtype=float).copy()
 
     autozyme.activate("fipy")
     _reset_caches()
-
-    mesh = fp.Grid1D(nx=12)
-    var = fp.CellVariable(name="phi", mesh=mesh, value=0.0)
-    var.constrain(1.0, mesh.facesLeft)
-    var.constrain(0.0, mesh.facesRight)
-    eqn = fp.TransientTerm() == fp.DiffusionTerm(coeff=1.0) + 5.0
-
-    # Sanity: the disabled path handles this fine (proves it's a patch issue).
+    patched = _solve()           # must NOT raise now
+    assert np.all(np.isfinite(patched))
     with autozyme.disabled():
-        mesh_v = fp.Grid1D(nx=12)
-        var_v = fp.CellVariable(name="phi", mesh=mesh_v, value=0.0)
-        var_v.constrain(1.0, mesh_v.facesLeft)
-        var_v.constrain(0.0, mesh_v.facesRight)
-        eqn_v = fp.TransientTerm() == fp.DiffusionTerm(coeff=1.0) + 5.0
-        for _ in range(2):
-            eqn_v.solve(var=var_v, dt=0.5)
-        assert np.all(np.isfinite(var_v.value))
-
-    # Patched path: 2nd solve hits the cache and raises TypeError (the xfail).
-    for _ in range(2):
-        eqn.solve(var=var, dt=0.5)
+        vanilla = _solve()
+    np.testing.assert_allclose(patched, vanilla, rtol=1e-9, atol=1e-12)
 
 
 # --------------------------------------------------------------------------

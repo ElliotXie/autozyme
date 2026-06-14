@@ -52,7 +52,10 @@ def _resolve_python_for(task_dir: Path) -> str:
     """Resolve the interpreter via task.yaml::executor.python; fall back to sys.executable."""
     try:
         from zyme.parsers.task_yaml import parse_executor
-        execu = parse_executor(task_dir)
+        # parse_executor expects the task.yaml FILE path (it .read_text()s it),
+        # not the task directory; passing the dir raised IsADirectoryError that
+        # the bare except swallowed, silently ignoring executor.python.
+        execu = parse_executor(task_dir / "task.yaml")
         spec = execu.get("python") if isinstance(execu, dict) else None
         if spec:
             return _resolve_python(spec)

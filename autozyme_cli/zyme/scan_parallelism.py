@@ -243,8 +243,9 @@ def _path_priority(rel_path: str) -> int:
         return 20
     if any(seg.startswith("test_") or seg.startswith("test-") for seg in parts):
         return 20
-    # Production: R/, src/, <pkg>/
-    if parts and parts[0] in {"R", "src", "inst"}:
+    # Production: R/, src/, <pkg>/. NOTE: `p` is already lowercased above, so the
+    # R-package source dir compares as "r" (matching it as "R" never fired).
+    if parts and parts[0] in {"r", "src", "inst"}:
         return 0
     # Python: typically <pkg_name>/<modules>.py at root
     if parts and len(parts) > 1 and parts[0] not in {"build", "dist", "scripts"}:

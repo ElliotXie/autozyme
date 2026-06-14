@@ -345,15 +345,16 @@ class TestResolvePythonFor:
                             lambda spec: f"/envs/{spec}/bin/python")
         assert pkgci._resolve_python_for(tmp_path) == "/envs/myenv/bin/python"
 
-    def test_parse_executor_arg_quirk_falls_back(self, tmp_path):
-        # SUSPECTED BUG (documented, not fixed): _resolve_python_for passes the
-        # task *directory* to parse_executor, but parse_executor expects the
-        # task.yaml *file* path (it calls task_yaml.read_text(), which raises
-        # IsADirectoryError on a dir). The broad `except Exception` swallows it,
-        # so executor.python is SILENTLY IGNORED here and the interpreter always
-        # falls back to sys.executable even when task.yaml declares an env.
+    def test_honors_executor_python_via_real_parse_executor(self, tmp_path, monkeypatch):
+        # B14 fix: _resolve_python_for now passes the task.yaml FILE path to
+        # parse_executor (not the directory), so a declared executor.python is
+        # honored end-to-end through the REAL parser. Only _resolve_python is
+        # stubbed, for a deterministic return.
         (tmp_path / "task.yaml").write_text("executor:\n  python: myenv\n")
-        assert pkgci._resolve_python_for(tmp_path) == sys.executable
+        monkeypatch.setattr(pkgci, "_resolve_python",
+                            lambda spec: f"/envs/{spec}/bin/python")
+        assert pkgci._resolve_python_for(tmp_path) == "/envs/myenv/bin/python"
+        assert pkgci._resolve_python_for(tmp_path) != sys.executable
 
 
 class TestSpawnWorkers:

@@ -249,7 +249,7 @@ def fast_compute(self, indexed_frames, verbose=None, *, progressbar_kwargs=None)
                 if w is None:
                     coms = buf_seg_f64[:take].sum(axis=1) * n_atoms_inv
                 else:
-                    coms = np.einsum("cij,j->ci", buf_seg_f64[:take], w) * w_inv_sum
+                    coms = np.einsum("cij,i->cj", buf_seg_f64[:take], w) * w_inv_sum
                 buf_seg_f64[:take] -= coms[:, None, :]
                 end = pos + take
                 rmsd_col2 = rmsd[pos:end, 2]
@@ -292,7 +292,7 @@ def fast_compute(self, indexed_frames, verbose=None, *, progressbar_kwargs=None)
         if w is None:
             coms = buf_chunk_f64[:actual].sum(axis=1) * n_atoms_inv
         else:
-            coms = np.einsum("cij,j->ci", buf_chunk_f64[:actual], w) * w_inv_sum
+            coms = np.einsum("cij,i->cj", buf_chunk_f64[:actual], w) * w_inv_sum
         buf_chunk_f64[:actual] -= coms[:, None, :]
         for j in range(actual):
             idx = chunk_start + j

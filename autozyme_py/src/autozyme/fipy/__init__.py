@@ -388,13 +388,20 @@ def fast_binary_buildAndAddMatrices(self, var, SparseMatrix, boundaryConditions=
         b_trans_const = bvec if numerix.any(bvec) else None
         break
 
-    _BINARY_FULL_CACHE[cache_key] = (
-        combined_matrix_snapshot,
-        tmpRHSvector_diff_for_cache,
-        tmpMatrix_diff_for_cache,
-        mass_per_dt,
-        b_trans_const,
-    )
+    # Only cache when the diffusion sub-term was captured. For an out-of-scope
+    # equation (e.g. transient == diffusion + source, where the diffusion term
+    # is nested inside a _BinaryTerm) tmpRHSvector_diff_for_cache stays None;
+    # caching it would make the next solve's cache-hit branch do `None + b_trans`
+    # -> TypeError. Skipping the store falls back to the full upstream path on
+    # every solve, which is correct (just unoptimized for the unsupported shape).
+    if tmpRHSvector_diff_for_cache is not None:
+        _BINARY_FULL_CACHE[cache_key] = (
+            combined_matrix_snapshot,
+            tmpRHSvector_diff_for_cache,
+            tmpMatrix_diff_for_cache,
+            mass_per_dt,
+            b_trans_const,
+        )
 
     return (var, matrix, RHSvector)
 

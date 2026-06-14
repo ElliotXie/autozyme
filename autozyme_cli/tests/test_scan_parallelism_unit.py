@@ -80,14 +80,15 @@ class TestPathPriority:
         assert _path_priority("src/kernel.cpp") == 0
         assert _path_priority("inst/patch.R") == 0
 
-    def test_uppercase_R_dir_quirk(self):
-        # NOTE (latent bug): _path_priority lowercases rel_path before the
-        # production check `parts[0] in {"R", "src", "inst"}`. After lowercasing
-        # "R/" becomes "r/", which is NOT in that uppercase set, so R-package
-        # source under R/ is ranked 5 (generic Python-module tier), not 0.
-        # Documenting current behavior, not endorsing it.
-        assert _path_priority("R/foo.R") == 5
-        assert _path_priority("R\\foo.R") == 5
+    def test_R_dir_ranks_production(self):
+        # B3 fix: the production check now compares against the lowercased "r"
+        # (rel_path is lowercased first), so R-package source under R/ is ranked
+        # 0 (production), not 5. Works for both / and \\ separators.
+        assert _path_priority("R/foo.R") == 0
+        assert _path_priority("R\\foo.R") == 0
+        # src/ and inst/ (already lowercase) still rank production.
+        assert _path_priority("src/kernel.cpp") == 0
+        assert _path_priority("inst/include/x.h") == 0
 
     def test_tests_rank_20(self):
         assert _path_priority("tests/test_foo.py") == 20
