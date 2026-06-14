@@ -59,11 +59,11 @@ local({
                      info = paste0("status after activate -> ",
                                    unname(st[pn])))
 
-        # Restore (the round-trip assertion)
-        autozyme::restore(pn)
+        # Deactivate (the round-trip assertion)
+        autozyme::deactivate(pn)
         st <- autozyme::status()
         expect_equal(unname(st[pn]), "inactive",
-                     info = paste0("status after restore -> ",
+                     info = paste0("status after deactivate -> ",
                                    unname(st[pn])))
       })
 
@@ -73,7 +73,7 @@ local({
   test_that("activate() on registered patch with missing upstream returns FALSE", {
     pn <- "missing_upstream_probe"
     on.exit({
-      try(autozyme::restore(pn), silent = TRUE)
+      try(autozyme::deactivate(pn), silent = TRUE)
       if (exists(pn, envir = autozyme:::.zyme_registry, inherits = FALSE)) {
         rm(list = pn, envir = autozyme:::.zyme_registry)
       }

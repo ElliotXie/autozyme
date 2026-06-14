@@ -134,13 +134,16 @@ def _resolve_price_name(model: str | None) -> str | None:
         return None
     if find_model_price(model) is not None:
         return model
+    # Fall back to the family's price row. Return the table's `id` (with the
+    # `anthropic:` prefix) so find_model_price actually matches it: the bare
+    # `claude-opus-4-latest` string is NOT itself a key/alias in MODEL_PRICES.
     m = model.lower()
     if m.startswith("claude-opus"):
-        return "claude-opus-4-latest"
+        return "anthropic:claude-opus-4-latest"
     if m.startswith("claude-sonnet"):
-        return "claude-sonnet-4-latest"
+        return "anthropic:claude-sonnet-4-latest"
     if m.startswith("claude-haiku"):
-        return "claude-haiku-4.5"
+        return "anthropic:claude-haiku-4.5"
     return model  # let pricing return None; caller notes "no price"
 
 

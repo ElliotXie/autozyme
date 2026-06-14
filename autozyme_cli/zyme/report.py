@@ -2044,8 +2044,10 @@ footer { padding: 60px 0 40px; color: var(--muted); font-size: 12px; border-top:
 }
 """
 
-    # JS — theme toggle + chart hover
-    JS = """
+    # JS — theme toggle + chart hover. Raw string: the only backslash escapes
+    # in this block are JS-regex `\s`, which must reach the browser literally
+    # (a non-raw string emits a SyntaxWarning for the unrecognized escape).
+    JS = r"""
 (function() {
   // ----- theme toggle (persisted) -----
   const root = document.documentElement;

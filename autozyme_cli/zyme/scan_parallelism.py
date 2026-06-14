@@ -307,7 +307,7 @@ _KNOB_DEFAULT_RE = re.compile(
     r"\b([A-Za-z_][A-Za-z0-9_.]*)\s*"
     r"(?::\s*[A-Za-z_][\w\[\], ]*)?"        # optional Python type annotation
     r"\s*=\s*"
-    r"([A-Z][A-Z]+|[A-Za-z_][A-Za-z0-9_:.]*\(\)|[+\-]?\d+L?|"     # FALSE/TRUE/None / func() / 4 / 4L
+    r"([A-Z][A-Z]+|True|False|[A-Za-z_][A-Za-z0-9_:.]*\(\)|[+\-]?\d+L?|"     # FALSE/TRUE / True/False / func() / 4 / 4L
     r"\"[^\"]*\"|'[^']*')"
 )
 
@@ -464,36 +464,103 @@ def _parse_r_description(path: Path) -> dict[str, set[str]]:
     return fields_out
 
 
+# Project-metadata keys (pyproject.toml / setup.cfg / setup.py) that look like
+# `key = ...` and must NOT be mistaken for dependency names. Applied to BOTH
+# the bare-requirements regex (where `=` is a version operator) and the quoted
+# regex in the fallback scanner.
+_DEP_METADATA_KEYS = {
+    "python", "version", "name", "description", "license", "author", "url",
+    "homepage", "dependencies", "requires", "requires-python", "readme",
+    "classifiers", "keywords", "maintainers", "authors", "license-files",
+    "requires-dist", "optional-dependencies", "scripts", "packages",
+}
+
+
+def _dep_name_from_spec(spec: str) -> str | None:
+    """Leading package name from a PEP 508 requirement (drop extras/version)."""
+    m = re.match(r"[A-Za-z][A-Za-z0-9_.\-]*", spec.strip())
+    if not m:
+        return None
+    return m.group(0).lower().replace("_", "-")
+
+
+def _regex_scan_deps(text: str, deps: set[str]) -> None:
+    """Best-effort dependency-name scan for setup.py / setup.cfg / requirements
+    (and as a fallback for pyproject.toml when no TOML parser is available)."""
+    # requirements.txt format: bare `numpy>=1.21` per line. NOTE: a TOML/
+    # setup.cfg assignment `name = "x"` also matches here (`=` is in the
+    # operator class), so the same metadata-key exclusion is applied.
+    for m in re.finditer(
+        r"^\s*([A-Za-z][A-Za-z0-9_.\-]*)\s*[<>=!~]",
+        text, re.MULTILINE,
+    ):
+        name = m.group(1).lower().replace("_", "-")
+        if name not in _DEP_METADATA_KEYS:
+            deps.add(name)
+    # Quoted string forms used by setup.py / pyproject.toml:
+    #   'numpy>=1.21'  (setup.py INSTALL_REQUIRES)
+    #   "numpy"         (pyproject.toml dependencies)
+    # The name must follow the opening quote immediately and the optional
+    # version specifier may not span a newline, so the regex cannot pair the
+    # closing quote of one `key = "value"` with the opening quote of the next.
+    for m in re.finditer(
+        r'["\']([a-zA-Z][a-zA-Z0-9_.\-]{1,40})\s*(?:[<>=!~][^"\'\n]*)?["\']',
+        text,
+    ):
+        name = m.group(1).lower().replace("_", "-")
+        if name not in _DEP_METADATA_KEYS:
+            deps.add(name)
+
+
 def _parse_python_deps(repo: Path) -> set[str]:
     """Extract top-level dependency names from pyproject.toml / setup.py /
     requirements.txt. Names only — versions stripped."""
     deps: set[str] = set()
-    for fname in ("requirements.txt", "setup.py", "pyproject.toml", "setup.cfg"):
+
+    # pyproject.toml: parse with a real TOML parser when available so project
+    # metadata keys/values (name, license, ...) are never mistaken for deps.
+    pp = repo / "pyproject.toml"
+    if pp.is_file():
+        try:
+            text = pp.read_text(encoding="utf-8", errors="replace")
+        except (OSError, UnicodeError):
+            text = None
+        if text is not None:
+            try:
+                import tomllib as _toml  # Python 3.11+
+            except ImportError:
+                try:
+                    import tomli as _toml  # backport
+                except ImportError:
+                    _toml = None
+            data = None
+            if _toml is not None:
+                try:
+                    data = _toml.loads(text)
+                except Exception:
+                    data = None
+            if isinstance(data, dict):
+                proj = data.get("project") or {}
+                specs: list = list(proj.get("dependencies") or [])
+                for grp in (proj.get("optional-dependencies") or {}).values():
+                    specs.extend(grp or [])
+                specs.extend((data.get("build-system") or {}).get("requires") or [])
+                for spec in specs:
+                    name = _dep_name_from_spec(str(spec))
+                    if name:
+                        deps.add(name)
+            else:
+                # No TOML parser / unparseable: degrade to the regex scanner.
+                _regex_scan_deps(text, deps)
+
+    for fname in ("requirements.txt", "setup.py", "setup.cfg"):
         p = repo / fname
-        if not p.exists():
+        if not p.is_file():
             continue
         try:
-            text = p.read_text(encoding="utf-8", errors="replace")
+            _regex_scan_deps(p.read_text(encoding="utf-8", errors="replace"), deps)
         except (OSError, UnicodeError):
             continue
-        # requirements.txt format: bare `numpy>=1.21` per line
-        for m in re.finditer(
-            r"^\s*([A-Za-z][A-Za-z0-9_.\-]*)\s*[<>=!~]",
-            text, re.MULTILINE,
-        ):
-            deps.add(m.group(1).lower().replace("_", "-"))
-        # Quoted string forms used by setup.py / pyproject.toml:
-        #   'numpy>=1.21'  (setup.py INSTALL_REQUIRES)
-        #   "numpy"         (pyproject.toml dependencies)
-        # Allow optional version specifier inside the quotes.
-        for m in re.finditer(
-            r'["\']\s*([a-zA-Z][a-zA-Z0-9_.\-]{1,40})\s*(?:[<>=!~][^"\']*)?["\']',
-            text,
-        ):
-            name = m.group(1).lower().replace("_", "-")
-            if name not in {"python", "version", "name", "description",
-                            "license", "author", "url", "homepage"}:
-                deps.add(name)
     return deps
 
 

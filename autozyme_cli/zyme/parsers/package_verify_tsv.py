@@ -90,7 +90,11 @@ def tier_dataset_map_from_task_yaml(task_yaml: Path) -> dict[str, str]:
         return {}
     try:
         task = yaml.safe_load(task_yaml.read_text(encoding="utf-8")) or {}
-    except (OSError, ValueError):
+    except (OSError, ValueError, yaml.YAMLError):
+        # yaml.safe_load raises yaml.YAMLError (NOT a ValueError) on malformed
+        # YAML; catch it so a bad task.yaml returns {} as the docstring promises.
+        return {}
+    if not isinstance(task, dict):
         return {}
     out: dict[str, str] = {}
     for ds in task.get("datasets") or []:

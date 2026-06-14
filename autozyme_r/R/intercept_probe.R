@@ -73,7 +73,7 @@
   # ordered for deterministic diffs.
   keys <- sort(names(counts))
   pieces <- vapply(keys, function(k) {
-    sprintf('"%s": %d', gsub('"', '\\\\"', k, fixed = TRUE),
+    sprintf('"%s": %d', gsub('"', '\\"', k, fixed = TRUE),
             as.integer(counts[[k]]))
   }, character(1))
   cat("{\n  ", paste(pieces, collapse = ",\n  "), "\n}\n",

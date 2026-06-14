@@ -14,7 +14,7 @@ test_that("set_threads rejects bad input", {
   expect_error(set_threads(-1))
 })
 
-test_that("register + activate + restore roundtrip on a synthetic upstream", {
+test_that("register + activate + deactivate roundtrip on a synthetic upstream", {
   # Use 'tools' (base R, always available) as a synthetic upstream.
   # Capture original at definition time — referencing tools::file_ext from
   # inside the body would resolve via namespace at call time and hit the
@@ -28,7 +28,7 @@ test_that("register + activate + restore roundtrip on a synthetic upstream", {
     targets = list(file_ext = fast_file_ext)
   )
   on.exit({
-    try(restore("tools_demo"), silent = TRUE)
+    try(deactivate("tools_demo"), silent = TRUE)
     if (exists("tools_demo", envir = autozyme:::.zyme_registry)) {
       rm("tools_demo", envir = autozyme:::.zyme_registry)
     }
@@ -38,13 +38,13 @@ test_that("register + activate + restore roundtrip on a synthetic upstream", {
   expect_equal(status()[["tools_demo"]], "active")
   expect_equal(tools::file_ext("foo.R"), "R_fast")
 
-  restore("tools_demo")
+  deactivate("tools_demo")
   expect_equal(status()[["tools_demo"]], "inactive")
   expect_equal(tools::file_ext("foo.R"), "R")
 })
 
 test_that("unknown patch name raises", {
-  expect_error(restore("does_not_exist"))
+  expect_error(deactivate("does_not_exist"))
   expect_error(activate("does_not_exist"))
 })
 
