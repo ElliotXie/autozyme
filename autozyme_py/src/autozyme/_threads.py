@@ -35,8 +35,11 @@ def auto_threads(cap: int | None = None) -> int:
     """Pick a sensible thread count for a patch.
 
     Resolves a worker count using this priority order:
-      1. ``AUTOZYMER_THREADS`` environment variable (explicit user override;
-         wins over everything, including ``cap``).
+      1. The first set of these environment variables, in order:
+         ``ZYME_THREADS`` (primary) > ``AUTOZYME_THREADS`` >
+         ``OMP_NUM_THREADS`` > ``AUTOZYMER_THREADS`` (legacy last-resort
+         spelling). An explicit env override wins over everything,
+         including ``cap``.
       2. The module-level option set by ``set_threads()`` (also wins over
          ``cap``).
       3. Hardware default: ``os.cpu_count() - 1``, bounded above by ``cap``
@@ -62,7 +65,7 @@ def auto_threads(cap: int | None = None) -> int:
     Examples:
         >>> auto_threads()                        # hardware default
         >>> auto_threads(cap=8)                   # cap at 8
-        >>> os.environ["AUTOZYMER_THREADS"] = "4"
+        >>> os.environ["ZYME_THREADS"] = "4"
         >>> auto_threads(cap=8)                   # 4 (env wins)
     """
     # 1. Thread budget from env -- wins over cap. Honor any of the env

@@ -616,7 +616,7 @@ def inspect(name: str) -> dict[str, Any]:
     registration of patches that were only `list_patches()`-discovered.
 
     Returns:
-        dict with keys: name, status, tested_against, installed_version,
+        dict with keys: name, status, tested_against, installed_versions,
         targets (list of dicts: upstream, attr, fast_fn, original, currently_bound).
     """
     targets = _resolve_activation_target(name)

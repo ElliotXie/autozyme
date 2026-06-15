@@ -282,7 +282,7 @@ def build_parser():
     pr.add_argument("--dataset", dest="dataset", default=None,
                     help="Primary tier (or dataset name) to run against. "
                          "FRESH ROUND: this is the decision row that counts toward the "
-                         "100-round budget (status=pending). WITH --rerun: this is one of "
+                         "50-round budget (status=pending). WITH --rerun: this is one of "
                          "the tiers being re-measured (status=rerun, no budget consumed). "
                          "Default = first dataset listed in task.yaml.")
     pr.add_argument("--extra-tiers", dest="extra_tiers", default=None,
@@ -296,7 +296,7 @@ def build_parser():
                          "are free reruns of HEAD.")
     pr.add_argument("--phase", choices=["optimize", "validate", "memory"], default="optimize",
                     help="Which phase this run belongs to. `optimize` (default) is the "
-                         "100-round speed-up budget. `memory` is the 50-round "
+                         "50-round speed-up budget. `memory` is the 50-round "
                          "memory-optimization loop (separate counter). `validate` is "
                          "the Phase 3 fix-loop budget (30 rounds, separate counter). "
                          "Stamped on every row written; cmd_status / cmd_plot filter by phase.")
