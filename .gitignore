@@ -41,6 +41,7 @@ Rprof.out
 # fresh_user_check / smoke flow, not by the release sync)
 test_mac/
 test_windows/
+validation/
 
 # OS
 .DS_Store
