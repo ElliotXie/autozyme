@@ -557,11 +557,30 @@ deactivate <- function(name) {
   invisible(NULL)
 }
 
+#' Restore one patch, a subset, or a vector of patches/subsets
+#'
+#' Backwards-compatible alias for \code{deactivate()}.
+#'
+#' @param name A patch name, a subset name, or a character vector mixing them.
+#' @export
+restore <- function(name) {
+  deactivate(name)
+}
+
 #' Deactivate every patch, rebinding upstream to its original implementation
 #' @export
 deactivate_all <- function() {
   for (name in ls(.zyme_registry)) .deactivate_one(name)
   invisible(NULL)
+}
+
+#' Restore every patch, rebinding upstream to its original implementation
+#'
+#' Backwards-compatible alias for \code{deactivate_all()}.
+#'
+#' @export
+restore_all <- function() {
+  deactivate_all()
 }
 
 #' Show the activation state of every available patch

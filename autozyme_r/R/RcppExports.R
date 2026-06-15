@@ -137,6 +137,10 @@ native_cca_formA <- function(X1, X2) {
     .Call(`_autozyme_native_cca_formA`, X1, X2)
 }
 
+native_matmul <- function(A, B) {
+    .Call(`_autozyme_native_matmul`, A, B)
+}
+
 rctd_cpp_row_idx1 <- function(y, k_val) {
     .Call(`_autozyme_rctd_cpp_row_idx1`, y, k_val)
 }

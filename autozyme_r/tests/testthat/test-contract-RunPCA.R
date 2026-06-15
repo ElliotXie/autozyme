@@ -27,21 +27,25 @@ test_that("RunPCA zyme=FALSE matches vanilla embeddings up to sign", {
   }
 })
 
-test_that("RunPCA actually exercises the Python fast path when numpy is available", {
-  # Parity tests above pass even if the patch silently falls back to upstream
-  # (no Python) -- so they can't catch a "we shipped a no-op" regression. This
-  # test asserts the Python path *ran*. It only runs where a numpy/scipy Python
-  # can be bound; elsewhere the fallback is correct and there's nothing to check.
+test_that("RunPCA exercises a fast path (native or scipy) and not upstream irlba", {
+  # Parity tests above pass even on a silent fallback to upstream, so this is
+  # the regression net. The dispatcher tries native first (zero Python, runs
+  # when a fast BLAS resolves — bundled on Win, Accelerate on mac, AUTOZYME_
+  # OPENBLAS_DLL elsewhere) and only then scipy. Branch the assertion on
+  # native_pca_available():
+  #   native available -> expect numpy NOT imported (proves native fired)
+  #   native missing   -> expect numpy IS imported (proves scipy fired)
+  # Either way the upstream irlba fallback would import neither, so the test
+  # catches silent regressions on both code paths.
   .skip_if_no_seurat()
   skip_if_not_installed("reticulate")
-  skip_if_not(isTRUE(.az_py_bind()), "no Python with numpy/scipy available")
+  native_ok <- isTRUE(autozyme:::native_pca_available())
+  if (!native_ok) {
+    skip_if_not(isTRUE(.az_py_bind()),
+                "no native BLAS and no Python with numpy/scipy")
+  }
 
   obj <- .make_scaled_seurat()
-
-  # Both fast RunPCA paths (default + StdAssay) call reticulate::import("numpy")
-  # inside the function body, so a numpy import *during the call* proves the
-  # Python branch ran rather than the upstream irlba fallback. Spy on import
-  # while delegating to the real one so the computation still happens.
   orig_import <- reticulate::import
   used_python <- FALSE
   testthat::local_mocked_bindings(
@@ -52,6 +56,10 @@ test_that("RunPCA actually exercises the Python fast path when numpy is availabl
     .package = "reticulate")
 
   out <- suppressWarnings(Seurat::RunPCA(obj, npcs = 10, verbose = FALSE))
-  expect_true(used_python)                                # fast path was taken
-  expect_true("pca" %in% SeuratObject::Reductions(out))  # and produced a result
+  if (native_ok) {
+    expect_false(used_python)                            # native ran
+  } else {
+    expect_true(used_python)                             # scipy ran
+  }
+  expect_true("pca" %in% SeuratObject::Reductions(out))
 })

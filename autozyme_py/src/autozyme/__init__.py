@@ -46,12 +46,19 @@ __all__ = [
     "resolve_dataset_path",
     "deactivate",
     "deactivate_all",
+    "restore",
+    "restore_all",
     "set_threads",
     "speedups",
     "status",
     "subset",
     "verify_patch",
 ]
+
+# Backwards-compatible aliases. The public lifecycle name is deactivate(), but
+# older docs, smoke scripts, and user code used restore().
+restore = deactivate
+restore_all = deactivate_all
 
 
 def _banner() -> None:

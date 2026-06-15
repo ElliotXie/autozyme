@@ -34,7 +34,30 @@ bad() { printf '  \033[31mFAIL\033[0m %s\n' "$*"; FAIL=$((FAIL+1)); }
 hdr() { printf '\n== %s ==\n' "$*"; }
 
 RSCRIPT="$(command -v Rscript || true)"
-PYBASE="$(command -v python3 || command -v python || true)"
+
+# autozyme_py declares a minimum Python (requires-python). Parse it so this
+# harness stays in sync with pyproject.toml; fall back to 3.10 if unreadable.
+PY_MIN="$(grep -E '^[[:space:]]*requires-python' "$REPO/autozyme_py/pyproject.toml" 2>/dev/null \
+            | grep -oE '3\.[0-9]+' | head -1)"
+PY_MIN="${PY_MIN:-3.10}"
+PY_MIN_MAJOR="${PY_MIN%%.*}"; PY_MIN_MINOR="${PY_MIN##*.}"
+
+# Pick a Python that actually SATISFIES that floor. Naively taking the first
+# `python3` is wrong on macOS, where /usr/bin/python3 is the 3.9 system stub:
+# below autozyme_py's floor, so the Python tiers fail the version gate even when
+# a valid interpreter (python3.12, …) is installed. Prefer a newer python3.x and
+# require >= PY_MIN; leave PYBASE empty (→ honest skip) if none qualifies.
+PYBASE=""
+for _cand in python3.13 python3.12 python3.11 python3.10 python3 python; do
+  _p="$(command -v "$_cand" 2>/dev/null)" || continue
+  [ -n "$_p" ] || continue
+  if "$_p" - "$PY_MIN_MAJOR" "$PY_MIN_MINOR" <<'PY' 2>/dev/null
+import sys
+need = (int(sys.argv[1]), int(sys.argv[2]))
+sys.exit(0 if sys.version_info[:2] >= need else 1)
+PY
+  then PYBASE="$_p"; break; fi
+done
 # The real library paths (where Rcpp/data.table etc. live). We strip the conda /
 # autozyme ENV VARS to expose machine-specific assumptions, but we must NOT hide
 # autozyme's own declared dependencies — a real user gets those pulled in.
@@ -112,8 +135,9 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 hdr "Tier 0 (Python): fresh venv install autozyme + import"
 if [ -z "$PYBASE" ]; then
-  echo "  (skip — python not found)"
+  echo "  (skip — no python >= $PY_MIN on PATH; autozyme_py declares requires-python >=$PY_MIN)"
 else
+  echo "  (using $PYBASE — $("$PYBASE" --version 2>&1))"
   clean_export autozyme_py
   VENV="$WORK/venv"
   if "$PYBASE" -m venv "$VENV" >"$WORK/venv.log" 2>&1 \

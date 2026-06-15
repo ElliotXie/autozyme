@@ -525,6 +525,18 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// native_matmul
+arma::mat native_matmul(const arma::mat& A, const arma::mat& B);
+RcppExport SEXP _autozyme_native_matmul(SEXP ASEXP, SEXP BSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type A(ASEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type B(BSEXP);
+    rcpp_result_gen = Rcpp::wrap(native_matmul(A, B));
+    return rcpp_result_gen;
+END_RCPP
+}
 // rctd_cpp_row_idx1
 NumericVector rctd_cpp_row_idx1(NumericVector y, int k_val);
 RcppExport SEXP _autozyme_rctd_cpp_row_idx1(SEXP ySEXP, SEXP k_valSEXP) {
@@ -1096,6 +1108,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_autozyme_native_pca_available", (DL_FUNC) &_autozyme_native_pca_available, 0},
     {"_autozyme_native_pca_run", (DL_FUNC) &_autozyme_native_pca_run, 3},
     {"_autozyme_native_cca_formA", (DL_FUNC) &_autozyme_native_cca_formA, 2},
+    {"_autozyme_native_matmul", (DL_FUNC) &_autozyme_native_matmul, 2},
     {"_autozyme_rctd_cpp_row_idx1", (DL_FUNC) &_autozyme_rctd_cpp_row_idx1, 2},
     {"_autozyme_rctd_cpp_row_idx_mat", (DL_FUNC) &_autozyme_rctd_cpp_row_idx_mat, 2},
     {"_autozyme_rctd_cpp_calc_log_l_sum", (DL_FUNC) &_autozyme_rctd_cpp_calc_log_l_sum, 7},

@@ -60,20 +60,24 @@ test_that("RunCCA.Seurat returns cca reduction and zyme=FALSE dimensions match",
   )
 })
 
-test_that("RunCCA actually exercises the Python fast path when numpy is available", {
-  # As with RunPCA: parity passes even on a silent fallback, so assert the
-  # Python path *ran*. Skipped where no numpy/scipy Python can be bound.
+test_that("RunCCA exercises a fast path (native or scipy) and not upstream svd", {
+  # Same idea as the RunPCA contract: branch on native_pca_available().
+  #   native available -> CCA SVD = form_A on a fast BLAS + irlba(mult=
+  #     native_matmul); never imports numpy/scipy.
+  #   native missing   -> CCA SVD = scipy.sparse.linalg.svds via reticulate.
+  # Either way the test rejects a silent fallback to upstream base::svd.
   .skip_if_no_seurat()
   skip_if_not_installed("reticulate")
-  skip_if_not(isTRUE(.az_py_bind()), "no Python with numpy/scipy available")
+  native_ok <- isTRUE(autozyme:::native_pca_available())
+  if (!native_ok) {
+    skip_if_not(isTRUE(.az_py_bind()),
+                "no native BLAS and no Python with numpy/scipy")
+  }
 
   obj_a <- .make_cca_seurat(1, "a")
   obj_b <- .make_cca_seurat(2, "b")
   features <- rownames(obj_a)[seq_len(120)]
 
-  # The fast RunCCA SVD runs through reticulate (numpy + scipy.sparse.linalg);
-  # an import of either during the call proves the Python branch executed
-  # rather than the upstream irlba fallback.
   orig_import <- reticulate::import
   used_python <- FALSE
   testthat::local_mocked_bindings(
@@ -86,6 +90,10 @@ test_that("RunCCA actually exercises the Python fast path when numpy is availabl
   patched <- suppressWarnings(suppressMessages(
     Seurat::RunCCA(obj_a, obj_b, features = features, num.cc = 20,
                    verbose = FALSE)))
-  expect_true(used_python)
+  if (native_ok) {
+    expect_false(used_python)                            # native ran
+  } else {
+    expect_true(used_python)                             # scipy ran
+  }
   expect_true("cca" %in% SeuratObject::Reductions(patched))
 })
