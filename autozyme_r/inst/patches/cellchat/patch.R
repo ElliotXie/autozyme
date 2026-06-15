@@ -58,12 +58,18 @@ if (requireNamespace("CellChat",  quietly = TRUE) &&
         omp  = tryCatch(RhpcBLASctl::omp_get_max_threads(), error = function(e) NA_integer_)
       )
     }
-    args <- as.list(rep("1", length(vars)))
+    # The OMP-parallel bootstrap / Pnull / inner kernels multithread cleanly now
+    # that the build links a single OpenMP runtime (src/Makevars + omp_compat.cpp).
+    # They were pinned to 1 only to dodge the macOS duplicate-libomp segfault, not
+    # for correctness. Use the standard autozyme thread budget so set_threads() /
+    # AUTOZYME_THREADS apply, capped at 8 to match the smoke recipe.
+    n <- as.integer(autozyme::auto_threads(cap = 8L))
+    args <- as.list(rep(as.character(n), length(vars)))
     names(args) <- vars
     do.call(Sys.setenv, args)
     if (requireNamespace("RhpcBLASctl", quietly = TRUE)) {
-      RhpcBLASctl::blas_set_num_threads(1L)
-      RhpcBLASctl::omp_set_num_threads(1L)
+      RhpcBLASctl::blas_set_num_threads(n)
+      RhpcBLASctl::omp_set_num_threads(n)
     }
     list(vars = vars, env = old_env, blas = old_blas)
   }
@@ -128,9 +134,9 @@ if (requireNamespace("CellChat",  quietly = TRUE) &&
     }
 
     # Keep a kill switch for unsupported branches, but default to the package
-    # native rewrite. The macOS attest crash was triggered by multi-threaded
-    # OpenMP/BLAS state inherited from the worker; the fast kernels are stable
-    # and still substantially faster when run with a single native thread.
+    # native rewrite. The OMP kernels run multithreaded via auto_threads() (the
+    # earlier macOS segfault was a duplicate-libomp link issue, fixed in the
+    # build, not a property of the kernels).
     if (!.cellchat_native_fast_enabled()) {
       return(.cellchat_orig_computeCommunProb(
         object = object, type = type, trim = trim, LR.use = LR.use,

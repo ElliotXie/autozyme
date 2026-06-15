@@ -965,31 +965,19 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
   #   AUTOZYME_MODE=for_paper_omp  → V3 path rebuilt by framework's 6.3 port
   #                                   phase using OMP-threaded kernels.
   #
-  # Platform note for for_paper_omp: the OMP kernels were authored on Windows
-  # (no fork). Raw OpenMP thread-spawn SEGFAULTs inside R on macOS arm64
-  # (homebrew libomp + R; crashes the moment >1 worker thread is created,
-  # independent of the kernel body). Linux + Windows R run raw OpenMP fine.
-  # On macOS we therefore fall back to the single-thread `for_paper` kernel —
-  # which is numerically identical AND is exactly how the macOS markers numbers
-  # in the paper were produced (find_all_markers/v3 iterated entirely at
-  # thread=1; the ~150x speedup is algorithmic, not from parallelism).
+  # Platform note for for_paper_omp: these OMP kernels used to SEGFAULT inside R
+  # on macOS arm64 -- not a kernel bug, but a duplicate OpenMP runtime (Homebrew
+  # libomp linked alongside R's own libomp), where a worker thread found a NULL
+  # kmp_info_t the instant it spawned. That is fixed at the build level now
+  # (src/Makevars links R's libomp; src/omp_compat.cpp supplies the one missing
+  # symbol), so the OMP path multithreads on macOS exactly like Linux/Windows.
+  # The old macOS single-thread fallback has been removed.
   fast_FindAllMarkers <- function(object, ...) {
     mode <- tolower(Sys.getenv("AUTOZYME_MODE", unset = ""))
     if (identical(mode, "for_paper")) {
       fast_FindAllMarkers_for_paper(object, ...)
     } else if (identical(mode, "for_paper_omp")) {
-      if (identical(Sys.info()[["sysname"]], "Darwin")) {
-        if (!isTRUE(getOption("autozyme.markers_omp_mac_notice"))) {
-          options(autozyme.markers_omp_mac_notice = TRUE)
-          message("autozyme: AUTOZYME_MODE=for_paper_omp on macOS -> using the ",
-                  "single-thread for_paper kernel (raw OpenMP segfaults in R on ",
-                  "macOS arm64; result is identical). Use Linux/Windows for the ",
-                  "OMP multi-thread path.")
-        }
-        fast_FindAllMarkers_for_paper(object, ...)
-      } else {
-        fast_FindAllMarkers_for_paper_omp(object, ...)
-      }
+      fast_FindAllMarkers_for_paper_omp(object, ...)
     } else {
       fast_FindAllMarkers_fusion(object, ...)
     }

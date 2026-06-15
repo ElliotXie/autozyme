@@ -26,14 +26,21 @@ OMP_LIB_DIR = $(shell \
     if [ -f "$$d/libomp.dylib" ]; then echo "$$d"; break; fi; \
   done)
 DARWIN_OMP_CXX = $(shell uname -s | grep -q Darwin && test -n "$(OMP_INCLUDE_DIR)" && echo "-Xclang -fopenmp -I$(OMP_INCLUDE_DIR)")
-# Link against libomp by ABSOLUTE path, not `-lomp`. R's default Makeconf
-# prepends `-L/Library/Frameworks/R.framework/Resources/lib` which (on macOS)
-# contains an OLDER x86_64-only libomp.dylib that lacks newer LLVM OpenMP
-# runtime symbols like __kmpc_dispatch_deinit (emitted by clang 17 for
-# `#pragma omp parallel for schedule(dynamic, ...)` in seurat_*.cpp). Using
-# `-lomp` lets the linker pick R's old libomp first; using the absolute
-# path forces resolution to the brew/anaconda libomp we actually want.
-DARWIN_OMP_LD  = $(shell uname -s | grep -q Darwin && test -n "$(OMP_LIB_DIR)" && echo "$(OMP_LIB_DIR)/libomp.dylib -Wl,-rpath,$(OMP_LIB_DIR)")
+# OpenMP runtime: link R's OWN libomp (${R_HOME}/lib/libomp.dylib) so the whole
+# R process shares a SINGLE OpenMP runtime. Linking a *different* libomp (e.g.
+# Homebrew's, which this Makevars used to force) loads a second LLVM OpenMP
+# runtime; on macOS arm64 that segfaults inside __kmp_suspend_initialize_thread
+# (a worker finds a NULL kmp_info_t) the instant a worker thread is spawned, so
+# EVERY schedule(dynamic) kernel (normalize/scale/sctransform/markers) crashed
+# at >1 thread. KMP_DUPLICATE_LIB_OK=TRUE does not help. (The old note here
+# claimed R's libomp was "x86_64-only and lacks __kmpc_dispatch_deinit": on
+# modern arm64 R it is a universal binary, and only that one symbol is missing
+# -- src/omp_compat.cpp supplies it as a no-op so linking R's libomp succeeds.)
+# We still COMPILE against Homebrew's omp.h (DARWIN_OMP_CXX, ABI-compatible);
+# only the link target changes. Falls back to Homebrew's libomp if R ships none.
+DARWIN_OMP_LD  = $(shell uname -s | grep -q Darwin && { \
+  if [ -f "${R_HOME}/lib/libomp.dylib" ]; then echo "${R_HOME}/lib/libomp.dylib"; \
+  elif [ -n "$(OMP_LIB_DIR)" ]; then echo "$(OMP_LIB_DIR)/libomp.dylib -Wl,-rpath,$(OMP_LIB_DIR)"; fi; })
 
 # Seurat patch kernels (seurat_*.cpp) use #pragma omp parallel for and benefit
 # from -O3 on tight sort/reduce loops. $(SHLIB_OPENMP_CXXFLAGS) is supplied by
