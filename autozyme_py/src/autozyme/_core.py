@@ -87,6 +87,7 @@ class _Patch:
     smoke: dict[str, Callable] | None = None
     tested_against: str | None = None  # e.g. "cell2location 0.1.4"
     tested_upstream_versions: dict[str, list[str]] | None = None
+    strict_upstream_versions: bool = False
     originals: dict[tuple[str, str], Any] = field(default_factory=dict)
     injected: bool = False
 
@@ -142,6 +143,7 @@ def register_patch(
     smoke: dict[str, Callable] | None = None,
     tested_against: str | None = None,
     tested_upstream_versions: dict[str, list[str]] | None = None,
+    strict_upstream_versions: bool = False,
 ) -> None:
     """Register a patch. Called by submodule __init__ at import time
     (which only happens when the user explicitly activates the patch).
@@ -155,6 +157,10 @@ def register_patch(
     where each value lists upstream versions the patch is known to parity-pass
     on. CI installs one job per (plugin, version) cell and re-runs the tiny
     tier; any miss opens a drift issue.
+
+    Set `strict_upstream_versions=True` for patches that bind private
+    upstream internals whose signatures are known to drift incompatibly.
+    Strict patches refuse activation outside `tested_upstream_versions`.
     """
     # Validate each target tuple up front so misuses (None / non-callable fast
     # fn) fail at register_patch time, not at activate() time three commands
@@ -223,12 +229,17 @@ def register_patch(
                         f"tested_upstream_versions[{pkg!r}] entries "
                         f"must be str, got {type(v).__name__}"
                     )
+    if strict_upstream_versions and not tested_upstream_versions:
+        raise ValueError(
+            "strict_upstream_versions=True requires tested_upstream_versions"
+        )
     _REGISTRY[name] = _Patch(
         name=name,
         targets=list(targets),
         smoke=smoke,
         tested_against=tested_against,
         tested_upstream_versions=tested_upstream_versions,
+        strict_upstream_versions=strict_upstream_versions,
     )
     _PROBE_CACHE.pop(name, None)
 
@@ -383,9 +394,44 @@ def _emit_inactive_marker(name: str, err: "str | None") -> None:
     )
 
 
+def _strict_version_error(p: _Patch) -> str | None:
+    """Return a user-facing incompatibility reason for strict-version patches."""
+    if not p.strict_upstream_versions:
+        return None
+    assert p.tested_upstream_versions is not None
+
+    mismatches = []
+    for pkg, known_versions in p.tested_upstream_versions.items():
+        actual = _installed_version(pkg)
+        known_bases = {_base_version(v) for v in known_versions}
+        if actual is None or _base_version(actual) not in known_bases:
+            if len(known_versions) == 1:
+                wanted = f"{pkg}=={known_versions[0]}"
+            else:
+                wanted = f"{pkg} in {{{', '.join(known_versions)}}}"
+            got = f"{pkg} {actual}" if actual else f"{pkg} (version unknown)"
+            mismatches.append(f"{got}; requires {wanted}")
+    if not mismatches:
+        return None
+    return (
+        "incompatible upstream version for strict patch "
+        f"{p.name!r}: " + "; ".join(mismatches)
+    )
+
+
+def _emit_incompatible_marker(name: str, err: str) -> None:
+    if os.environ.get("AUTOZYME_QUIET"):
+        return
+    print(f"[autozyme] {name} NOT activated -- {err}", file=sys.stderr)
+
+
 def _activate_one(p: _Patch) -> bool:
     if p.injected:
         return True
+    strict_err = _strict_version_error(p)
+    if strict_err is not None:
+        _emit_incompatible_marker(p.name, strict_err)
+        return False
     resolved = []
     missing = []
     for upstream, attr, fast_fn in p.targets:

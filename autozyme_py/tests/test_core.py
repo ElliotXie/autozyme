@@ -120,3 +120,26 @@ def test_register_allows_disjoint_targets_on_same_upstream():
     finally:
         _REGISTRY.pop("a_dumps", None)
         _REGISTRY.pop("a_loads", None)
+
+
+def test_strict_upstream_version_refuses_activation(capsys):
+    original_dumps = json.dumps
+
+    def fast_dumps(obj, **kwargs):
+        return "patched"
+
+    autozyme.register_patch(
+        "strict_version_demo",
+        [("json", "dumps", fast_dumps)],
+        tested_upstream_versions={"pip": ["0.0"]},
+        strict_upstream_versions=True,
+    )
+    try:
+        assert autozyme.activate("strict_version_demo") is False
+        assert json.dumps is original_dumps
+        stderr = capsys.readouterr().err
+        assert "strict_version_demo NOT activated" in stderr
+        assert "requires pip==0.0" in stderr
+    finally:
+        json.dumps = original_dumps
+        _REGISTRY.pop("strict_version_demo", None)

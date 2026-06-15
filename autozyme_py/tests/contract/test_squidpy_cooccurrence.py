@@ -53,7 +53,8 @@ pd = pytest.importorskip("pandas")
 def test_co_occurrence_runs_and_populates_uns(spatial_adata):
     """squidpy.gr.co_occurrence writes results to adata.uns."""
     import autozyme
-    autozyme.activate("squidpy_cooccurrence")
+    if not autozyme.activate("squidpy_cooccurrence"):
+        pytest.skip("squidpy_cooccurrence is strict to squidpy==1.6.5")
 
     sq.gr.co_occurrence(spatial_adata, cluster_key="cluster",
                         spatial_key="spatial", show_progress_bar=False)
@@ -65,7 +66,8 @@ def test_co_occurrence_zyme_false_matches_patched_shape(spatial_adata):
     """Patched + zyme=False produce co-occurrence matrices of same shape."""
     import autozyme
     import anndata as ad
-    autozyme.activate("squidpy_cooccurrence")
+    if not autozyme.activate("squidpy_cooccurrence"):
+        pytest.skip("squidpy_cooccurrence is strict to squidpy==1.6.5")
 
     a_fast = spatial_adata.copy()
     a_vanilla = spatial_adata.copy()

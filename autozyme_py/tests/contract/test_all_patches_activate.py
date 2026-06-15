@@ -44,6 +44,13 @@ def _is_upstream_installed(name: str) -> tuple[bool, str | None]:
     return _probe_patch_installed(name)
 
 
+def _strict_version_incompatibility(name: str) -> str | None:
+    from autozyme._core import _REGISTRY, _import_submodule, _strict_version_error
+
+    _import_submodule(name)
+    return _strict_version_error(_REGISTRY[name])
+
+
 @pytest.fixture(autouse=True)
 def _restore_all_between_tests():
     """Each activation test runs with a clean slate.
@@ -75,6 +82,9 @@ def test_patch_activate_smoke(patch_name):
     installed, err = _is_upstream_installed(patch_name)
     if not installed:
         pytest.skip(f"upstream missing for {patch_name!r}: {err}")
+    strict_err = _strict_version_incompatibility(patch_name)
+    if strict_err:
+        pytest.skip(strict_err)
 
     result = autozyme.activate(patch_name)
     assert result is True, (
@@ -95,6 +105,9 @@ def test_patch_activate_restore_roundtrip(patch_name):
     installed, err = _is_upstream_installed(patch_name)
     if not installed:
         pytest.skip(f"upstream missing for {patch_name!r}: {err}")
+    strict_err = _strict_version_incompatibility(patch_name)
+    if strict_err:
+        pytest.skip(strict_err)
 
     autozyme.activate(patch_name)
     autozyme.deactivate(patch_name)
@@ -120,6 +133,9 @@ def test_patch_all_targets_bound(patch_name):
     installed, err = _is_upstream_installed(patch_name)
     if not installed:
         pytest.skip(f"upstream missing for {patch_name!r}: {err}")
+    strict_err = _strict_version_incompatibility(patch_name)
+    if strict_err:
+        pytest.skip(strict_err)
 
     autozyme.activate(patch_name)
     targets = autozyme.inspect(patch_name).get("targets", [])

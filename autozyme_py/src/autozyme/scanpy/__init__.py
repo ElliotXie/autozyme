@@ -35,7 +35,8 @@ from ._pca import fast_pca
 from ._highly_variable import _patched_hvg
 from ._leiden import fast_leiden
 from ._rank_genes import _fast_rank_genes_groups
-from ._regress_out import fast_regress_out
+# regress_out patch temporarily disabled — see register_patch() below.
+# from ._regress_out import fast_regress_out
 from ._prepare import zyme_prepare
 
 
@@ -145,7 +146,8 @@ register_patch(
         ("scanpy.preprocessing", "normalize_total",       fast_normalize_total),
         ("scanpy.preprocessing", "log1p",                  fast_log1p),
         ("scanpy.preprocessing", "scale",                  fast_scale),
-        ("scanpy.preprocessing", "regress_out",            fast_regress_out),
+        # regress_out temporarily disabled:
+        # ("scanpy.preprocessing", "regress_out",            fast_regress_out),
         ("scanpy.preprocessing", "highly_variable_genes",  _patched_hvg),
         ("scanpy.tools",         "pca",                    fast_pca),
         # sc.pp.pca is the modern canonical PCA call; sc.tl.pca is its
@@ -157,7 +159,8 @@ register_patch(
         ("scanpy.tools",         "rank_genes_groups",      _fast_rank_genes_groups),
 
         # Canonical module attrs for the funcs that scanpy itself imports internally
-        ("scanpy.preprocessing._simple",                 "regress_out",          fast_regress_out),
+        # regress_out temporarily disabled:
+        # ("scanpy.preprocessing._simple",                 "regress_out",          fast_regress_out),
         ("scanpy.preprocessing._highly_variable_genes", "highly_variable_genes", _patched_hvg),
         ("scanpy.preprocessing._pca",                    "pca",                   fast_pca),
         ("scanpy.tools._leiden",                         "leiden",               fast_leiden),

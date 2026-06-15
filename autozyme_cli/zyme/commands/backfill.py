@@ -625,44 +625,23 @@ def _seurat_patch_needs_python(patch_name: str) -> bool:
 
 
 def _preflight_seurat_python(env: dict) -> tuple[bool, str]:
-    """Verify that an Rscript subprocess can find Python+numpy+scipy via
-    the EXACT same logic patch.R's `.seurat_init_python` uses (conda CLI
-    probe + `$CONDA_PREFIX/python(.exe)` + `$HOME/anaconda3/...` paths).
-    Setting RETICULATE_PYTHON is NOT enough — patch.R never reads it —
-    so the probe must mirror patch.R or it gives false positives.
+    """Verify that an Rscript subprocess can find Python+numpy+scipy the way
+    the seurat PCA/CCA fast path will at run time. Rather than re-implement
+    (and drift from) the discovery, the probe calls autozyme's OWN binder,
+    `autozyme:::.az_py_bind()` -- the exact function patch.R's
+    `.seurat_init_python` uses. It honors AUTOZYME_PYTHON / RETICULATE_PYTHON /
+    CONDA_PREFIX and otherwise auto-discovers a numpy+scipy Python on PATH, so
+    this preflight can never give a false result by mirroring the wrong logic.
     Runs in ~3 seconds."""
     rscript = _platform_rscript()
     if not rscript:
         return False, "Rscript not found on PATH"
     probe = (
-        "suppressMessages(library(reticulate));"
+        "suppressMessages(library(autozyme));"
         "ok <- tryCatch({"
-        " py_found <- FALSE;"
-        # Step 1: mirror patch.R — try named conda envs
-        " for (env_name in c('scanpy310', 'base')) {"
-        "   tryCatch({ reticulate::use_condaenv(env_name, required=TRUE);"
-        "              py_found <<- TRUE; break }, error = function(e) NULL)"
-        " };"
-        # Step 2: mirror patch.R — direct paths via CONDA_PREFIX / HOME
-        " if (!py_found) {"
-        "   candidates <- c("
-        "     file.path(Sys.getenv('CONDA_PREFIX'), 'python'),"
-        "     file.path(Sys.getenv('CONDA_PREFIX'), 'python.exe'),"
-        "     file.path(Sys.getenv('HOME'), 'anaconda3/envs/scanpy310/bin/python'),"
-        "     file.path(Sys.getenv('HOME'), 'miniconda3/envs/scanpy310/bin/python')"
-        "   );"
-        "   for (p in candidates) {"
-        "     if (nzchar(p) && file.exists(p)) {"
-        "       reticulate::use_python(p, required=TRUE);"
-        "       py_found <<- TRUE; break"
-        "     }"
-        "   }"
-        " };"
-        " if (!py_found) stop('no Python with numpy+scipy located');"
-        " reticulate::import('numpy', convert=FALSE);"
-        " reticulate::import('scipy.linalg', convert=FALSE);"
-        " reticulate::import('scipy.sparse.linalg', convert=FALSE);"
-        " py_config()$python"
+        "  if (!isTRUE(autozyme:::.az_py_bind()))"
+        "    stop('no Python with numpy+scipy located');"
+        "  reticulate::py_config()$python"
         "}, error = function(e) paste('FAIL:', conditionMessage(e)));"
         "cat(ok, '\\n')"
     )
@@ -868,33 +847,26 @@ def _subprocess_env(framework: Path) -> dict[str, str]:
     # faster for end users but isn't what the paper measured. Affects
     # only the markers dispatcher; other patches ignore this env.
     env["AUTOZYME_MODE"] = "for_paper_omp"
-    # autozyme R's seurat PCA/CCA fast path needs Python+numpy+scipy via
-    # reticulate. patch.R's `.seurat_init_python` tries (1)
-    # reticulate::use_condaenv("scanpy310"|"base") which invokes the conda
-    # CLI, then (2) direct file paths $CONDA_PREFIX/python(.exe) and
-    # $HOME/anaconda3/envs/scanpy310/bin/python.
+    # autozyme R's seurat PCA/CCA fast path needs a numpy+scipy Python.
+    # autozyme's binder (.az_py_bind) honors AUTOZYME_PYTHON /
+    # RETICULATE_PYTHON / CONDA_PREFIX and otherwise auto-discovers one on
+    # PATH, so normally nothing is needed here -- the inherited environment
+    # (e.g. an already-activated conda env) is enough.
     #
-    # On this Win box step (1) fails because mamba.bat returns rc=1, and
-    # step (2)'s HOME-relative paths are Unix-style and don't match the
-    # Windows D:\anaconda3 layout. RETICULATE_PYTHON alone is IGNORED by
-    # patch.R — it only consults the paths above. So we set CONDA_PREFIX
-    # so the fallback `$CONDA_PREFIX/python.exe` resolves.
-    #
-    # Without this, integrate_cca silently falls back to upstream Seurat —
-    # the "patched" run measures baseline code at baseline speed (incident
-    # 2026-06-05 / 2026-06-06: two consecutive 4-5h Wave 1 runs wasted
-    # before this was diagnosed).
-    if os.name == "nt":
-        candidate_prefixes = (
-            r"D:\anaconda3\envs\scanpy310",
-            r"D:\anaconda3",
-        )
-        for pfx in candidate_prefixes:
-            if (Path(pfx) / "python.exe").exists():
-                env.setdefault("CONDA_PREFIX", pfx)
-                env.setdefault("RETICULATE_PYTHON",
-                               str(Path(pfx) / "python.exe"))
-                break
+    # On a box where the intended interpreter isn't already active (a common
+    # Windows case: the conda env isn't on PATH and CONDA_PREFIX is unset),
+    # point the campaign at it WITHOUT hardcoding a machine path: set
+    # AUTOZYME_BACKFILL_CONDA_PREFIX (e.g. to ...\envs\<name> on Windows or
+    # .../envs/<name> elsewhere) before launching. Skipping this is what once
+    # silently measured baseline code at baseline speed (integrate_cca falls
+    # back to upstream Seurat when no Python resolves: incident
+    # 2026-06-05 / 2026-06-06, two 4-5h Wave 1 runs wasted before diagnosis).
+    pfx = env.get("AUTOZYME_BACKFILL_CONDA_PREFIX", "")
+    if pfx:
+        py = Path(pfx) / ("python.exe" if os.name == "nt" else "bin/python")
+        if py.exists():
+            env.setdefault("CONDA_PREFIX", pfx)
+            env.setdefault("RETICULATE_PYTHON", str(py))
     return env
 
 

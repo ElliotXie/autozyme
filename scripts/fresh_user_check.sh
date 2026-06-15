@@ -82,11 +82,20 @@ clean_export() {
 
 # ─────────────────────────────────────────────────────────────────────────────
 hdr "Scan: machine-specific leaks in shipped code"
-# Patterns that should never ship to a user (tests/fixtures + this script excluded).
+# Goal: catch ACCIDENTAL dev-path hardcoding (scanpy310, /opt/anaconda3, ~user,
+# git+ssh, D:\autosearch) in code that actually reaches a published user.
+# The only class intentionally NOT flagged: sidecars that sync_release.py strips
+# from the release -- fingerprints.json, raw speedups.*.tsv shards,
+# scanpy/speedups/*, final_audit / CHANGELOG / THREAD_NOTE. They carry captured
+# dev paths in measurement provenance but never ship (mirrors
+# SOURCE_EXCLUDE_PATTERNS in scripts/sync_release.py).
+# Anchor each skip on the path:line boundary (":<n>:") so a genuine hit is never
+# dropped merely because a pattern also appears inside a TSV's captured error text.
+SKIP_SHIPPED='(fingerprints\.json|speedups\.tsv|speedups\.[^:/]*\.tsv|speedups_multithread_archive\.tsv|/speedups/[^:]*|final_audit\.md|CHANGELOG\.md|THREAD_NOTE\.md|fresh_user_check[^:]*):[0-9]+:'
 LEAKS="$(git -C "$REPO" grep -nE 'scanpy310|/opt/anaconda3|/Users/[a-z]+/autozyme|git\+ssh|[A-Z]:\\\\autosearch' -- \
           'autozyme_r/R' 'autozyme_r/inst/patches' 'autozyme_py/src' \
           'autozyme_cli/zyme' 2>/dev/null \
-          | grep -vE 'fresh_user_check' || true)"
+          | grep -vE "$SKIP_SHIPPED" || true)"
 if [ -z "$LEAKS" ]; then ok "no scanpy310 / dev-path / ssh-url leaks in shipped code"
 else bad "machine-specific leaks found:"; printf '%s\n' "$LEAKS" | sed 's/^/      /'; fi
 

@@ -18,10 +18,25 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering",
 ]
+# Empty by design: autozyme is a monkey-patch overlay, not a dependency hub.
+# It accelerates whatever upstream packages you already have installed, so it
+# must not force a heavy ML stack on every install. Version-fragile upstreams
+# (a patch that binds one release's internal API) are opt-in extras below, each
+# with an exact tested freeze in its patch SCOPE.md.
 dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "pyyaml"]
+# cell2location patch binds 0.1.5's PyroModule class name + forward signature,
+# both version-fragile. Pins the ecosystem packages the patch targets; torch /
+# numpy resolve transitively (kept unpinned so the extra stays cross-platform).
+# Exact validated freeze (incl. torch/numpy) is in
+# src/autozyme/cell2location/SCOPE.md.
+cell2location = [
+    "cell2location==0.1.5",
+    "scvi-tools==1.3.3",
+    "pyro-ppl==1.9.1",
+]
 
 [project.urls]
 Homepage = "https://autozyme.com"

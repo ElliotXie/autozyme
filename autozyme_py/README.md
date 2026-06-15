@@ -32,6 +32,11 @@ configuration. Each patch ships its own `SCOPE.md` in its package directory
 (`src/autozyme/<patch>/SCOPE.md`) documenting its supported scope and
 out-of-scope behavior.
 
+A few patches accelerate **version-fragile** upstreams that bind one release's
+internal API (e.g. `cell2location`, pinned to 0.1.5). Those carry a tested
+install recipe under "Tested environment" in their `SCOPE.md` and an opt-in
+extra, e.g. `pip install "autozyme[cell2location]"`.
+
 ### Opt-out levels
 
 ```python

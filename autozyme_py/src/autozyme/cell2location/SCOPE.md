@@ -13,6 +13,16 @@ _Auto-generated from `scripts/patch_scope.tsv`. Do not edit by hand — run
 `scripts/gen_scope_docs.py`._
 
 
+## Tested environment
+
+The patched `forward` binds cell2location 0.1.5's long PyroModule class name and its `forward(x_data, idx, batch_index)` signature, both of which change across releases, so keep cell2location pinned to 0.1.5. Validated on macOS arm64, Python 3.10.20:
+
+```bash
+pip install "cell2location==0.1.5" "scvi-tools==1.3.3" "pyro-ppl==1.9.1" "torch==2.11.0" "numpy==2.2.6" "anndata==0.11.4" "scanpy==1.11.5"
+```
+
+numpy 2.x is supported (numpy<2 is NOT required). The `autozyme` package declares no hard dependencies by design: it overlays whatever cell2location you already have. Install the stack above, or `pip install "autozyme[cell2location]"`.
+
 ## `cell2location.models.Cell2location.train`
 
 - **In-scope output equivalence:** tolerance

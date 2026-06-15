@@ -520,4 +520,5 @@ register_patch(
     smoke={"load": _smoke_load, "call": _smoke_call, "save": _smoke_save},
     tested_against="squidpy 1.6.5",
     tested_upstream_versions={"squidpy": ["1.6.5"]},
+    strict_upstream_versions=True,
 )

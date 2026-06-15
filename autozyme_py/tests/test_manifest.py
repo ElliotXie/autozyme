@@ -22,12 +22,19 @@ from autozyme._core import (
     _REGISTRY,
     _import_submodule,
     _probe_patch_installed,
+    _strict_version_error,
 )
 from autozyme._subsets import UPSTREAMS
 
 
 def _is_installed(name: str) -> bool:
     return _probe_patch_installed(name)[0]
+
+
+def _skip_if_strict_version_incompatible(name: str) -> None:
+    err = _strict_version_error(_REGISTRY[name])
+    if err:
+        pytest.skip(err)
 
 
 @pytest.mark.parametrize("name", _AVAILABLE)
@@ -125,6 +132,7 @@ def test_activate_binds_every_declared_target(name):
         pytest.skip(f"upstream for {name!r} importable per probe but "
                     f"fails at import: {e}")
     try:
+        _skip_if_strict_version_incompatible(name)
         assert ok is True, (
             f"activate({name!r}) returned False even though the upstream "
             f"probe reports installed — likely a wrong dotted path in "

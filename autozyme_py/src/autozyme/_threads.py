@@ -120,7 +120,8 @@ def auto_threads(cap: int | None = None) -> int:
 
 
 def safe_set_num_threads(n: int) -> int:
-    """Set numba's parallel-kernel thread count, tolerating a locked pool.
+    """Set numba's parallel-kernel thread count, tolerating a locked or
+    capped pool.
 
     Numba locks its thread pool the first time any ``@njit(parallel=True)``
     kernel runs in the process; subsequent ``nb.set_num_threads(x)`` calls
@@ -128,21 +129,28 @@ def safe_set_num_threads(n: int) -> int:
     patches activate in the same process (e.g. scanpy + xclim), one of
     them locks the pool and the other crashes on its own set call.
 
+    Numba also rejects any value outside ``[1, NUMBA_NUM_THREADS]`` with a
+    ``ValueError``. That fires when the requested budget exceeds the
+    launchable pool -- e.g. a user sets ``NUMBA_NUM_THREADS=8`` on a 14-core
+    box but leaves OMP/ZYME/AUTOZYME_THREADS unset, so the budget resolves
+    to the hardware default (~13). We clamp the target to the pool ceiling
+    first, and treat both errors as "keep whatever is currently in effect".
+
     This wrapper: returns the value actually in effect after the call.
-    No-op when target equals current; falls back to current count on
-    RuntimeError (the kernel still runs correctly at the locked count,
-    just with mild perf degradation vs the requested count).
     """
     try:
         import numba as nb
     except ImportError:
         return int(n)
     current = nb.get_num_threads()
-    target = int(n)
+    # set_num_threads() only accepts [1, NUMBA_NUM_THREADS]; clamp so an
+    # over-budget request degrades to the pool ceiling instead of crashing.
+    pool_max = getattr(nb.config, "NUMBA_NUM_THREADS", None) or current
+    target = max(1, min(int(n), int(pool_max)))
     if current == target:
         return current
     try:
         nb.set_num_threads(target)
         return target
-    except RuntimeError:
+    except (RuntimeError, ValueError):
         return current
