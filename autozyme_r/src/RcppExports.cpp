@@ -490,6 +490,41 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// native_pca_available
+bool native_pca_available();
+RcppExport SEXP _autozyme_native_pca_available() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(native_pca_available());
+    return rcpp_result_gen;
+END_RCPP
+}
+// native_pca_run
+List native_pca_run(const arma::mat& X, int npcs, bool weight_by_var);
+RcppExport SEXP _autozyme_native_pca_run(SEXP XSEXP, SEXP npcsSEXP, SEXP weight_by_varSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< int >::type npcs(npcsSEXP);
+    Rcpp::traits::input_parameter< bool >::type weight_by_var(weight_by_varSEXP);
+    rcpp_result_gen = Rcpp::wrap(native_pca_run(X, npcs, weight_by_var));
+    return rcpp_result_gen;
+END_RCPP
+}
+// native_cca_formA
+arma::mat native_cca_formA(const arma::mat& X1, const arma::mat& X2);
+RcppExport SEXP _autozyme_native_cca_formA(SEXP X1SEXP, SEXP X2SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type X1(X1SEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type X2(X2SEXP);
+    rcpp_result_gen = Rcpp::wrap(native_cca_formA(X1, X2));
+    return rcpp_result_gen;
+END_RCPP
+}
 // rctd_cpp_row_idx1
 NumericVector rctd_cpp_row_idx1(NumericVector y, int k_val);
 RcppExport SEXP _autozyme_rctd_cpp_row_idx1(SEXP ySEXP, SEXP k_valSEXP) {
@@ -1058,6 +1093,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_autozyme_az_blas_gemm", (DL_FUNC) &_autozyme_az_blas_gemm, 6},
     {"_autozyme_az_blas_crossprod", (DL_FUNC) &_autozyme_az_blas_crossprod, 3},
     {"_autozyme_az_blas_info", (DL_FUNC) &_autozyme_az_blas_info, 1},
+    {"_autozyme_native_pca_available", (DL_FUNC) &_autozyme_native_pca_available, 0},
+    {"_autozyme_native_pca_run", (DL_FUNC) &_autozyme_native_pca_run, 3},
+    {"_autozyme_native_cca_formA", (DL_FUNC) &_autozyme_native_cca_formA, 2},
     {"_autozyme_rctd_cpp_row_idx1", (DL_FUNC) &_autozyme_rctd_cpp_row_idx1, 2},
     {"_autozyme_rctd_cpp_row_idx_mat", (DL_FUNC) &_autozyme_rctd_cpp_row_idx_mat, 2},
     {"_autozyme_rctd_cpp_calc_log_l_sum", (DL_FUNC) &_autozyme_rctd_cpp_calc_log_l_sum, 7},

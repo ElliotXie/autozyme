@@ -1176,6 +1176,15 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
 
   # ── RunPCA ───────────────────────────────────────────────────────────────
 
+  # TRUE when the compiled native PCA/CCA kernel + a fast BLAS backend resolve
+  # (macOS Accelerate / OpenBLAS via dlopen). Honors AUTOZYME_NATIVE_PCA=0
+  # (checked C++-side). Old installs without the kernel return FALSE -> scipy.
+  .seurat_native_ok <- function() {
+    exists("native_pca_available", envir = asNamespace("autozyme"),
+           inherits = FALSE) &&
+      isTRUE(tryCatch(native_pca_available(), error = function(e) FALSE))
+  }
+
   fast_RunPCA_default <- function(object, assay = NULL, npcs = 50,
                                    rev.pca = FALSE, weight.by.var = TRUE,
                                    verbose = TRUE, ndims.print = 1:5,
@@ -1189,8 +1198,7 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
     # Scope guard: approx=FALSE asks for the exact (prcomp) decomposition; the
     # Gram+eigh fast path does not honor it, so fall back. Additive — for the
     # default approx=TRUE call this is FALSE and the fast path runs unchanged.
-    if (!isTRUE(zyme) || isTRUE(rev.pca) || !isTRUE(approx) ||
-        !.seurat_init_python()) {
+    if (!isTRUE(zyme) || isTRUE(rev.pca) || !isTRUE(approx)) {
       return(.seurat_orig_RunPCA_default(
         object = object, assay = assay, npcs = npcs, rev.pca = rev.pca,
         weight.by.var = weight.by.var, verbose = verbose,
@@ -1202,6 +1210,37 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
     npcs <- min(npcs, nrow(object) - 1)
     nfeatures <- nrow(object); n <- ncol(object)
 
+    # Native, Python-free fast path (macOS Accelerate / OpenBLAS via dlopen):
+    # Gram + partial eigh, bit-exact to the scipy path up to sign. Falls through
+    # to scipy on any error or when no fast BLAS is found.
+    if (.seurat_native_ok()) {
+      .native_res <- tryCatch({
+        obj <- object
+        if (!is.matrix(obj)) obj <- as.matrix(obj)
+        storage.mode(obj) <- "double"
+        nv <- native_pca_run(obj, as.integer(npcs), isTRUE(weight.by.var))
+        feature.loadings <- nv$loadings
+        cell.embeddings  <- nv$embeddings
+        rownames(feature.loadings) <- .feature.names
+        colnames(feature.loadings) <- paste0(reduction.key, 1:npcs)
+        rownames(cell.embeddings)  <- .cell.names
+        colnames(cell.embeddings)  <- colnames(feature.loadings)
+        SeuratObject::CreateDimReducObject(
+          embeddings = cell.embeddings, loadings = feature.loadings,
+          assay = assay, stdev = as.numeric(nv$sdev), key = reduction.key)
+      }, error = function(e) NULL)
+      if (!is.null(.native_res)) return(.native_res)
+    }
+
+    # scipy fast path (fallback). If Python is unavailable too, use upstream.
+    if (!.seurat_init_python()) {
+      return(.seurat_orig_RunPCA_default(
+        object = object, assay = assay, npcs = npcs, rev.pca = rev.pca,
+        weight.by.var = weight.by.var, verbose = verbose,
+        ndims.print = ndims.print, nfeatures.print = nfeatures.print,
+        reduction.key = reduction.key, seed.use = seed.use, approx = approx,
+        ...))
+    }
     np <- reticulate::import("numpy", convert = FALSE)
     X_py <- np$asarray(object, dtype = "float64")
     XtX  <- X_py$`__matmul__`(np$ascontiguousarray(np$transpose(X_py)))
@@ -1300,22 +1339,12 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
                                    num.cc = 20, seed.use = 42, verbose = FALSE,
                                    zyme = TRUE, turbo = NULL, ...) {
     zyme <- .seurat_zyme_flag(zyme, turbo)
-    if (!isTRUE(zyme) || !.seurat_init_python()) {
+    if (!isTRUE(zyme)) {
       return(.seurat_orig_RunCCA_default(
         object1 = object1, object2 = object2, standardize = standardize,
         num.cc = num.cc, seed.use = seed.use, verbose = verbose, ...))
     }
     if (!is.null(seed.use)) set.seed(seed.use)
-    guard <- NULL
-    if (Sys.info()[["sysname"]] == "Darwin") {
-      guard <- .seurat_python_thread_guard()
-      if (is.null(guard)) {
-        return(.seurat_orig_RunCCA_default(
-          object1 = object1, object2 = object2, standardize = standardize,
-          num.cc = num.cc, seed.use = seed.use, verbose = verbose, ...))
-      }
-      on.exit(guard$`__exit__`(NULL, NULL, NULL), add = TRUE)
-    }
     cells1 <- colnames(object1); cells2 <- colnames(object2)
     if (standardize) {
       object1 <- Seurat:::Standardize(mat = object1, display_progress = FALSE)
@@ -1323,6 +1352,45 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
     }
     if (inherits(object1, "sparseMatrix")) object1 <- as.matrix(object1)
     if (inherits(object2, "sparseMatrix")) object2 <- as.matrix(object2)
+
+    # Native, Python-free CCA SVD: form A = X1^T X2 on a fast BLAS + irlba Krylov
+    # top-k. Matches scipy svds; falls through to scipy on error / no BLAS / no
+    # irlba. object1/object2 are already standardized above.
+    if (.seurat_native_ok() && requireNamespace("irlba", quietly = TRUE)) {
+      .native_res <- tryCatch({
+        storage.mode(object1) <- "double"; storage.mode(object2) <- "double"
+        A  <- native_cca_formA(object1, object2)
+        nc <- min(as.integer(num.cc), nrow(A) - 1L, ncol(A) - 1L)
+        ir <- irlba::irlba(A, nv = nc, nu = nc)
+        ord <- order(-ir$d)
+        U <- ir$u[, ord, drop = FALSE]; V <- ir$v[, ord, drop = FALSE]
+        cca.data <- rbind(U, V)
+        colnames(cca.data) <- paste0("CC", seq_len(nc))
+        rownames(cca.data) <- c(cells1, cells2)
+        cca.data <- apply(cca.data, 2, function(x) { if (sign(x[1]) == -1) x <- x * -1; x })
+        list(ccv = cca.data, d = ir$d[ord])
+      }, error = function(e) NULL)
+      if (!is.null(.native_res)) return(.native_res)
+    }
+
+    # scipy fast path (fallback). object1/object2 already standardized, so pass
+    # standardize = FALSE to the upstream fallback. On Darwin scipy needs the
+    # threadpoolctl thread-guard.
+    if (!.seurat_init_python()) {
+      return(.seurat_orig_RunCCA_default(
+        object1 = object1, object2 = object2, standardize = FALSE,
+        num.cc = num.cc, seed.use = seed.use, verbose = verbose, ...))
+    }
+    guard <- NULL
+    if (Sys.info()[["sysname"]] == "Darwin") {
+      guard <- .seurat_python_thread_guard()
+      if (is.null(guard)) {
+        return(.seurat_orig_RunCCA_default(
+          object1 = object1, object2 = object2, standardize = FALSE,
+          num.cc = num.cc, seed.use = seed.use, verbose = verbose, ...))
+      }
+      on.exit(guard$`__exit__`(NULL, NULL, NULL), add = TRUE)
+    }
 
     np <- reticulate::import("numpy", convert = FALSE)
     scipy_sparse_linalg <- reticulate::import("scipy.sparse.linalg", convert = FALSE)

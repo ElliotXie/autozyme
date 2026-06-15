@@ -125,6 +125,18 @@ az_blas_info <- function(dll_paths = character()) {
     .Call(`_autozyme_az_blas_info`, dll_paths)
 }
 
+native_pca_available <- function() {
+    .Call(`_autozyme_native_pca_available`)
+}
+
+native_pca_run <- function(X, npcs, weight_by_var = TRUE) {
+    .Call(`_autozyme_native_pca_run`, X, npcs, weight_by_var)
+}
+
+native_cca_formA <- function(X1, X2) {
+    .Call(`_autozyme_native_cca_formA`, X1, X2)
+}
+
 rctd_cpp_row_idx1 <- function(y, k_val) {
     .Call(`_autozyme_rctd_cpp_row_idx1`, y, k_val)
 }
