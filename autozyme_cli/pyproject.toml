@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "CLI driver for the autozyme optimization loop"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "xie227", email = "xie227@wisc.edu" }]
+authors = [{ name = "Elliot Xie", email = "xie227@wisc.edu" }]
 keywords = ["scientific-computing", "performance", "iteration-loop"]
 classifiers = [
     "Development Status :: 3 - Alpha",

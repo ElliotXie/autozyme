@@ -3,14 +3,15 @@ target_repo: https://github.com/satijalab/seurat
 target_function: Seurat::FindAllMarkers
 signature: Seurat::FindAllMarkers(object = obj, verbose = FALSE)
 
-# Profile-only fixture built from the real workspace task. Data and reference
-# outputs are read from the original task; all profiler artifacts are written
-# under this fixture's pipeline/ directory so benchmark/profiling experiments
-# do not pollute the source task repository.
+# Profile-only fixture built from the real workspace task. The dataset paths
+# below are placeholders: point them at a local copy of the find_all_markers
+# task data (the .rds files are not shipped). All profiler artifacts are
+# written under this fixture's pipeline/ directory so benchmark/profiling
+# experiments do not pollute the source task repository.
 datasets:
-  - {tier: tiny,   name: pbmc68k_30k,            path: /Users/xie227/autozyme_mac/test_core_singlecell/test_find_all_markers/data/pbmc68k_30k.rds}
-  - {tier: medium, name: pbmc68k_full,           path: /Users/xie227/autozyme_mac/test_core_singlecell/test_find_all_markers/data/pbmc68k_full.rds}
-  - {tier: large,  name: pbmc200k_glaucoma_120k, path: /Users/xie227/autozyme_mac/test_core_singlecell/test_find_all_markers/data/pbmc200k_glaucoma_120k.rds}
+  - {tier: tiny,   name: pbmc68k_30k,            path: <WORKSPACE>/find_all_markers/data/pbmc68k_30k.rds}
+  - {tier: medium, name: pbmc68k_full,           path: <WORKSPACE>/find_all_markers/data/pbmc68k_full.rds}
+  - {tier: large,  name: pbmc200k_glaucoma_120k, path: <WORKSPACE>/find_all_markers/data/pbmc200k_glaucoma_120k.rds}
 
 metrics:
   - {name: neglog10_p_spearman,       threshold: 0.999,    comparator: gte}

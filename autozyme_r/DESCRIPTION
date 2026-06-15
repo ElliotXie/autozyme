@@ -12,6 +12,8 @@ Description: A registry of validated, monkey-patched fast replacements for hot
  is installed, and can be toggled per-call (zyme = FALSE), per-package
  (deactivate("name")), or globally (deactivate_all() / AUTOZYME_DISABLED env var).
 License: MIT + file LICENSE
+URL: https://autozyme.com, https://github.com/ElliotXie/autozyme
+BugReports: https://github.com/ElliotXie/autozyme/issues
 Encoding: UTF-8
 Depends: R (>= 4.0.0)
 Imports: utils,

@@ -9,7 +9,7 @@ description = "Drop-in accelerators for scientific Python packages"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "xie227", email = "xie227@wisc.edu" }]
+authors = [{ name = "Elliot Xie", email = "xie227@wisc.edu" }]
 keywords = ["scientific-computing", "single-cell", "performance", "monkey-patch"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -24,9 +24,9 @@ dependencies = []
 dev = ["pytest>=7", "pyyaml"]
 
 [project.urls]
-Homepage = "https://github.com/ElliotXie/autozyme-framework"
-Repository = "https://github.com/ElliotXie/autozyme-framework"
-Issues = "https://github.com/ElliotXie/autozyme-framework/issues"
+Homepage = "https://autozyme.com"
+Repository = "https://github.com/ElliotXie/autozyme"
+Issues = "https://github.com/ElliotXie/autozyme/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
