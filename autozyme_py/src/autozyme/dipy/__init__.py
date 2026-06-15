@@ -225,7 +225,12 @@ def fast_tensor_model_fit(self, data, *, mask=None):
         or self.fit_method is _orig_wls_fit_tensor
     )
     fit_method = dti.wls_fit_tensor if is_fast_wls else self.fit_method
-    if is_fast_wls and mask is not None:
+    # Explicit per-voxel `weights` must be sliced per chunk; this masked fast loop
+    # forwards the whole `weights` array to every chunk (chunk-2+ voxels then get
+    # mis-aligned weights or a shape mismatch). Defer weighted WLS fits to the
+    # upstream-style reshape fallback below, which fits the full masked block where
+    # the patched wls_fit_tensor's own iter_fit_tensor slices weights correctly.
+    if is_fast_wls and mask is not None and "weights" not in fit_kwargs:
         fit_kwargs["min_signal"] = min_signal
         chunk_step = int(fit_kwargs.get("step", 1250)) or int(mask.sum())
         mask_indices = np.flatnonzero(mask.ravel())

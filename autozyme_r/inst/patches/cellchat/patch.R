@@ -148,6 +148,22 @@ if (requireNamespace("CellChat",  quietly = TRUE) &&
     on.exit(.cellchat_exit_native_threads(.cellchat_thread_state), add = TRUE)
 
     type <- match.arg(type)
+    # The fast bootstrap aggregator computes the permutation null with triMean
+    # regardless of `type` (only the non-bootstrap aggregator dispatches FunMean),
+    # so a non-triMean type yields a correct net$prob but a WRONG net$pval.
+    # Delegate any non-triMean averaging fn to upstream.
+    if (type != "triMean") {
+      return(.cellchat_orig_computeCommunProb(
+        object = object, type = type, trim = trim, LR.use = LR.use,
+        raw.use = raw.use, population.size = population.size,
+        distance.use = distance.use, interaction.range = interaction.range,
+        scale.distance = scale.distance, k.min = k.min,
+        contact.dependent = contact.dependent, contact.range = contact.range,
+        contact.knn.k = contact.knn.k,
+        contact.dependent.forced = contact.dependent.forced,
+        do.symmetric = do.symmetric, nboot = nboot, seed.use = seed.use,
+        Kh = Kh, n = n))
+    }
     cat(type, "is used for calculating the average gene expression per cell group.", "\n")
     FunMean <- switch(type,
                       triMean         = .cellchat_orig_triMean,

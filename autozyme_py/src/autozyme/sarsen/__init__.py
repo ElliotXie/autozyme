@@ -160,7 +160,15 @@ def fast_terrain_correction(*args, **kwargs):
     product = kwargs.get("product")
     if product is None and args:
         product = args[0]
-    if getattr(product, "product_type", "GRD") != "GRD":
+    # correct_radiometry (RTC mode) is the 4th positional arg or a kwarg. The
+    # patched fast_simulate_acquisition's gamma_area branch divides dem_distance
+    # by slant_range_time instead of slant_range, inflating it by ~c/2 (~1.5e8),
+    # so RTC output is structurally wrong. GTC (correct_radiometry is None) never
+    # enters that branch. Fall back to upstream for non-GRD products AND for RTC.
+    correct_radiometry = kwargs.get(
+        "correct_radiometry", args[3] if len(args) > 3 else None)
+    if (getattr(product, "product_type", "GRD") != "GRD"
+            or correct_radiometry is not None):
         with autozyme.disabled(), _sarsen_xarray_options():
             return _orig_terrain_correction(*args, **kwargs)
     with _sarsen_xarray_options():

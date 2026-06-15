@@ -6,7 +6,7 @@
 #  - HVG selection matches baseline closely (variable_features overlap)
 #  - scale.data values within numerical tolerance (residuals)
 #  - per-call zyme=FALSE returns to upstream and produces baseline-equivalent
-#  - deactivate("seurat") invokes the on_deactivate hook and tears down PSOCK
+#  - restore("seurat") invokes the on_deactivate hook and tears down PSOCK
 
 suppressPackageStartupMessages({
   library(Seurat)
@@ -120,13 +120,13 @@ stopifnot(!identical(fn_env, environment(autozyme::with_disabled)))  # not ours
 cat("PASS: sctransform::vst is NOT persistently overridden\n")
 
 # === Deactivation hook ===================================================
-cat("\n=== deactivate('seurat') cleanup ===\n")
-# Cluster might be NULL (non-Windows) or populated. Either way deactivate
+cat("\n=== restore('seurat') cleanup ===\n")
+# Cluster might be NULL (non-Windows) or populated. Either way restore
 # should invoke .seurat_sct_cleanup without erroring.
-autozyme::deactivate("seurat")
-cat("PASS: deactivate('seurat') completed without error\n")
+autozyme::restore("seurat")
+cat("PASS: restore('seurat') completed without error\n")
 
-# After deactivate, calling NormalizeData should hit baseline (sanity check)
+# After restore, calling NormalizeData should hit baseline (sanity check)
 obj_after <- NormalizeData(obj, verbose = FALSE)
 ref_norm <- with(list(), {
   # baseline NormalizeData on identical object

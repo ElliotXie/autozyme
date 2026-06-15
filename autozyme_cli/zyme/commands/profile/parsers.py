@@ -744,22 +744,18 @@ def _parse_memray(bin_path: Path, executor: dict | None) -> tuple[list[dict], li
 def _split_memray_location(loc: str) -> tuple[str, str, int]:
     """Best-effort split of memray's `<func>:<file>:<line>` location string.
 
-    The file part may itself contain a colon (a Windows drive letter, e.g.
-    ``C:\\proj\\a.py``), so split ``func`` off the LEFT (before the first colon)
-    and ``line`` off the RIGHT (after the last colon); everything in between is
-    the file path, keeping any drive-letter colon intact.
+    Tolerates colons in the file path (rare on POSIX, common on Windows
+    drive letters) by splitting from the right.
     """
-    func, sep, rest = loc.partition(":")
-    if not sep:
-        return loc, "?", 0          # no colon at all -> not a location
-    file, sep2, line_s = rest.rpartition(":")
-    if not sep2:
-        return loc, "?", 0          # only one colon -> not a full func:file:line
-    try:
-        line = int(line_s)
-    except ValueError:
-        line = 0
-    return func, file, line
+    parts = loc.rsplit(":", 2)
+    if len(parts) == 3:
+        func, file, line_s = parts
+        try:
+            line = int(line_s)
+        except ValueError:
+            line = 0
+        return func, file, line
+    return loc, "?", 0
 
 
 # ---------------------------------------------------------------------------

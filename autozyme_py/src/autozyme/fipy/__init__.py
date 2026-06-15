@@ -388,20 +388,13 @@ def fast_binary_buildAndAddMatrices(self, var, SparseMatrix, boundaryConditions=
         b_trans_const = bvec if numerix.any(bvec) else None
         break
 
-    # Only cache when the diffusion sub-term was captured. For an out-of-scope
-    # equation (e.g. transient == diffusion + source, where the diffusion term
-    # is nested inside a _BinaryTerm) tmpRHSvector_diff_for_cache stays None;
-    # caching it would make the next solve's cache-hit branch do `None + b_trans`
-    # -> TypeError. Skipping the store falls back to the full upstream path on
-    # every solve, which is correct (just unoptimized for the unsupported shape).
-    if tmpRHSvector_diff_for_cache is not None:
-        _BINARY_FULL_CACHE[cache_key] = (
-            combined_matrix_snapshot,
-            tmpRHSvector_diff_for_cache,
-            tmpMatrix_diff_for_cache,
-            mass_per_dt,
-            b_trans_const,
-        )
+    _BINARY_FULL_CACHE[cache_key] = (
+        combined_matrix_snapshot,
+        tmpRHSvector_diff_for_cache,
+        tmpMatrix_diff_for_cache,
+        mass_per_dt,
+        b_trans_const,
+    )
 
     return (var, matrix, RHSvector)
 
@@ -423,6 +416,13 @@ def fast_term_solve(self, var=None, solver=None, boundaryConditions=(), dt=None)
         x = LU.solve(b_scaled)
         var.value = x.reshape(var.shape)
     """
+    # Delegate guard: a user-supplied solver is never reflected in the cache key
+    # nor honored on the cache-hit path (which always reuses the cached direct-LU
+    # factor), so any non-default solver must fall back to upstream rather than
+    # be silently ignored. The default (solver=None) fast path is untouched.
+    if solver is not None:
+        return _orig_term_solve(self, var=var, solver=solver,
+                                boundaryConditions=boundaryConditions, dt=dt)
     cache_key = (
         id(self), id(var), float(dt) if dt is not None else None,
         _term_state_sig(self, var, boundaryConditions),

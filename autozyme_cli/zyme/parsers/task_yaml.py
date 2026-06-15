@@ -39,23 +39,13 @@ def parse_dataset_name(task_yaml: Path) -> str:
 
 
 def _split_top_level_commas(s: str):
-    """Split `s` on commas only at brace-depth zero, ignoring commas inside
-    single/double-quoted segments. Used to walk inline-flow YAML entries that
-    may contain nested `{...}` values (e.g. `params:`) or quoted values that
-    legitimately embed commas (e.g. a mode description `mc.cores=8, fork`)."""
+    """Split `s` on commas only at brace-depth zero. Used to walk inline-flow
+    YAML entries that may contain nested `{...}` values (e.g. `params:`)."""
     parts = []
     depth = 0
-    quote = None
     buf = []
     for ch in s:
-        if quote is not None:
-            buf.append(ch)
-            if ch == quote:
-                quote = None
-        elif ch in ('"', "'"):
-            quote = ch
-            buf.append(ch)
-        elif ch == "{":
+        if ch == "{":
             depth += 1
             buf.append(ch)
         elif ch == "}":

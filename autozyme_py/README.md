@@ -28,7 +28,8 @@ parameters (`n_comps`, resolution, the data itself, …) can be set freely; a
 handful of parameters per patch are not on the fast path and **fall back to the
 upstream implementation automatically** (correct result, just not accelerated).
 A few documented approximations are validated only at their stated
-configuration. See [SCOPE.md](SCOPE.md) for the per-function supported scope and
+configuration. Each patch ships its own `SCOPE.md` in its package directory
+(`src/autozyme/<patch>/SCOPE.md`) documenting its supported scope and
 out-of-scope behavior.
 
 ### Opt-out levels

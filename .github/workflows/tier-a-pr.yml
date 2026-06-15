@@ -273,7 +273,7 @@ jobs:
           fast_file_ext <- function(x) paste0(original_file_ext(x), "_fast")
           register_patch("ci_tools_demo", "tools", list(file_ext = fast_file_ext))
           on.exit({
-            try(deactivate("ci_tools_demo"), silent = TRUE)
+            try(restore("ci_tools_demo"), silent = TRUE)
             if (exists("ci_tools_demo", envir = autozyme:::.zyme_registry)) {
               rm("ci_tools_demo", envir = autozyme:::.zyme_registry)
             }
@@ -281,7 +281,7 @@ jobs:
 
           stopifnot(isTRUE(activate("ci_tools_demo")))
           stopifnot(identical(tools::file_ext("foo.R"), "R_fast"))
-          deactivate("ci_tools_demo")
+          restore("ci_tools_demo")
           stopifnot(identical(tools::file_ext("foo.R"), "R"))
 
           cat("R direct smoke OK:", length(patches), "patches\n")

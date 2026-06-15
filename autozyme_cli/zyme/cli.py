@@ -87,7 +87,7 @@ def _parse_token_budget(value: str) -> int:
 
 
 from zyme.commands import (
-    cmd_init, cmd_init_check,
+    cmd_init, cmd_init_check, cmd_init_attest,
     cmd_run, cmd_accept, cmd_reject, cmd_dryrun,
     cmd_record_baseline, cmd_record_noise, cmd_reference, cmd_promote_baseline,
     cmd_baseline_list, cmd_baseline_show, cmd_baseline_rebench,
@@ -200,6 +200,41 @@ def build_parser():
                           "bugs between reference.{R,py} and pipeline/run.{R,py} "
                           "before they leak into iterate rounds.")
     pic.set_defaults(func=cmd_init_check)
+
+    pia = sub.add_parser(
+        "init-attest",
+        help="Scaffold a post-publication attest task under postpublication/ "
+             "(clones an existing task's structure for an agent to fill in)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Post-publication workflow: write the accelerator override in the\n"
+            "shipped patch (e.g. autozyme_r/inst/patches/seurat/patch.R), then\n"
+            "`init-attest` a task, fill it, attest, and sync the patch code to\n"
+            "release. The task is NOT wired into any attest manifest, so\n"
+            "publish auto-skips and paper numbers stay frozen.\n\n"
+            "Examples:\n"
+            "  # clone find_markers' shape into postpublication/find_neighbors_single/\n"
+            "  zyme init-attest find_neighbors_single --target 'Seurat::FindNeighbors'\n\n"
+            "  # clone a different existing task as the starting point\n"
+            "  zyme init-attest my_task --like find_markers --patch seurat\n"
+        ),
+    )
+    pia.add_argument("name", help="New task name (becomes postpublication/<name>/)")
+    pia.add_argument("--like", default="find_markers",
+                     help="Existing postpublication task to clone structure from "
+                          "(task.yaml, attest/smoke.R, evaluate.R, .gitignore, data "
+                          "symlink). Default: find_markers.")
+    pia.add_argument("--target", default=None,
+                     help="(optional) target_function to substitute into task.yaml "
+                          "(e.g. 'Seurat::FindMarkers').")
+    pia.add_argument("--patch", default="seurat",
+                     help="Patch name used in the printed attest command's --name "
+                          "(default: seurat).")
+    pia.add_argument("--dest", default=None,
+                     help="Parent dir for the task (default: framework/postpublication).")
+    pia.add_argument("--force", action="store_true",
+                     help="Overwrite <name>/ if it already exists.")
+    pia.set_defaults(func=cmd_init_attest)
 
     pr = sub.add_parser(
         "run", parents=[task_dir_parent],

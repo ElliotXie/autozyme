@@ -265,6 +265,31 @@
   if (length(m) && tier %in% names(m)) m[[tier]] else ""
 }
 
+# A crashed tier's sentinel note is the raw worker error blob, which renders as
+# bare NA columns in pv.tsv and hides the cause. When that blob carries an
+# out-of-memory signature, prefix a concise `oom (baseline|patched): ` tag so
+# the failure is human-readable at a glance and unambiguously machine-detectable
+# (the full cause is preserved after the tag). Pattern set mirrors
+# parsers/package_verify_tsv.py::_OOM_NOTE_PATTERNS so row_is_oom_sentinel stays
+# consistent across the CLI and both language workers.
+.classify_oom_note <- function(note) {
+  if (!nzchar(note)) return(note)
+  low <- tolower(note)
+  if (startsWith(low, "oom")) return(note)  # already tagged ("oom" is the tag we prepend)
+  # Raw OOM signatures: verbatim mirror of the raw set in
+  # parsers/package_verify_tsv.py::_OOM_NOTE_PATTERNS (everything after its
+  # leading "oom") and _verify.py::_OOM_NOTE_WRITE_PATTERNS. Keep the three in sync.
+  oom_pats <- c("out of memory", "memory limit", "cannot allocate",
+                "bad_alloc", "bad allocation", "exited -9", "sigkill", "killed")
+  if (!any(vapply(oom_pats, function(p) grepl(p, low, fixed = TRUE), logical(1)))) {
+    return(note)
+  }
+  variant <- if (grepl("activate=FALSE", note, fixed = TRUE)) " (baseline)"
+             else if (grepl("activate=TRUE", note, fixed = TRUE)) " (patched)"
+             else ""
+  paste0("oom", variant, ": ", note)
+}
+
 .append_package_verify_tsv <- function(task_dir, name, tsv_rows) {
   tsv_path <- file.path(task_dir, "package_verify.tsv")
   .assert_long_format_or_empty(tsv_path)
@@ -352,7 +377,7 @@
   new_rows <- list()
   for (r in tsv_rows) {
     tier <- r$tier
-    note <- if (is.null(r$note)) "" else r$note
+    note <- .classify_oom_note(if (is.null(r$note)) "" else r$note)
     baseline_secs <- if (is.null(r$baseline_secs)) numeric(0) else r$baseline_secs
     patched_secs <- if (is.null(r$patched_secs)) numeric(0) else r$patched_secs
     baseline_peaks <- if (is.null(r$baseline_peaks_mb)) numeric(0) else r$baseline_peaks_mb
@@ -435,7 +460,10 @@
   for (row in combined) {
     cells <- vapply(header_cols, function(col) {
       v <- row[[col]]
-      if (is.null(v)) "" else as.character(v)
+      # Same NA->"" coercion as .append_one_pv_row: read.table(na.strings =
+      # c("", "NA")) turns blank cells into NA, and a bare as.character(NA)
+      # would re-emit the literal "NA", demoting sentinel rows on round-trip.
+      if (is.null(v)) "" else { s <- as.character(v)[1]; if (is.na(s)) "" else s }
     }, character(1))
     writeLines(paste(cells, collapse = "\t"), con)
   }
@@ -516,7 +544,13 @@
   for (r in combined) {
     cells <- vapply(header_cols, function(col) {
       v <- r[[col]]
-      if (is.null(v)) "" else as.character(v)
+      # Coerce NULL/NA to "" so empty cells never serialize as the literal
+      # string "NA". read.table(na.strings = c("", "NA")) reads blank sentinel
+      # cells back as NA; without this, the next write would emit "NA", which
+      # then fails row_is_sentinel/row_is_oom_sentinel (they require empty
+      # rep_idx/variant/sec). This is the round-trip that silently demoted
+      # OOM sentinel rows to unrecognized "NA" rows.
+      if (is.null(v)) "" else { s <- as.character(v)[1]; if (is.na(s)) "" else s }
     }, character(1))
     writeLines(paste(cells, collapse = "\t"), con)
   }

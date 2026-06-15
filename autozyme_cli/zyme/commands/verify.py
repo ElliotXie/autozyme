@@ -924,13 +924,9 @@ def _parse_metrics_json_field(raw: str) -> dict:
     if len(s) >= 2 and s[0] == '"' and s[-1] == '"' and '""' in s:
         s = s[1:-1].replace('""', '"')
     try:
-        parsed = json.loads(s)
+        return json.loads(s)
     except (ValueError, TypeError):
         return {}
-    # The metrics_json column always holds an object; a valid-but-non-object
-    # JSON value (bare scalar / array) is not usable by callers that do
-    # `.get(...)`, so normalize it to {}.
-    return parsed if isinstance(parsed, dict) else {}
 
 
 

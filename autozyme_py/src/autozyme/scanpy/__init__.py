@@ -148,12 +148,18 @@ register_patch(
         ("scanpy.preprocessing", "regress_out",            fast_regress_out),
         ("scanpy.preprocessing", "highly_variable_genes",  _patched_hvg),
         ("scanpy.tools",         "pca",                    fast_pca),
+        # sc.pp.pca is the modern canonical PCA call; sc.tl.pca is its
+        # deprecated alias. They are distinct name bindings, so patching
+        # tools.pca alone left sc.pp.pca (the common path) on the slow original.
+        # Same fast_pca, just the other public alias.
+        ("scanpy.preprocessing", "pca",                    fast_pca),
         ("scanpy.tools",         "leiden",                 fast_leiden),
         ("scanpy.tools",         "rank_genes_groups",      _fast_rank_genes_groups),
 
         # Canonical module attrs for the funcs that scanpy itself imports internally
         ("scanpy.preprocessing._simple",                 "regress_out",          fast_regress_out),
         ("scanpy.preprocessing._highly_variable_genes", "highly_variable_genes", _patched_hvg),
+        ("scanpy.preprocessing._pca",                    "pca",                   fast_pca),
         ("scanpy.tools._leiden",                         "leiden",               fast_leiden),
 
         # _RankGenes class-method patches: scanpy-turbo had three patches

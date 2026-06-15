@@ -76,7 +76,7 @@ test_that("compareCluster returns compareClusterResult on multi-group input", {
 test_that("clusterProfiler patch preserves enrichResult validity checks", {
   .skip_if_no_clusterprofiler()
   testthat::skip_if_not_installed("DOSE")
-  autozyme::deactivate("clusterprofiler")
+  autozyme::restore("clusterprofiler")
   cls <- methods::getClass("enrichResult", where = asNamespace("DOSE"))
   before <- methods::getValidity(cls)
   suppressWarnings(autozyme::activate("clusterprofiler"))

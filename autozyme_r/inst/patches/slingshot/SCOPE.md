@@ -1,0 +1,23 @@
+# autozyme `slingshot` (R) — supported parameter scope
+
+This patch accelerates the function(s) below but is **validated only for a
+specific parameter envelope**. Within that envelope the fast path reproduces the
+upstream result (to the stated output-equivalence class); outside it, behavior
+is one of: falls back to upstream, raises, or — for a few documented
+approximations — silently approximates.
+
+Supported parameters (e.g. `n_comps` / `npcs`, resolution, the data itself) can
+be set freely. Only the parameters listed under each entry change behavior.
+
+_Auto-generated from `scripts/patch_scope.tsv`. Do not edit by hand — run
+`scripts/gen_scope_docs.py`._
+
+
+## `slingshot::slingshot (patch actually intercepts the internal S4 method getCurves,PseudotimeOrdering, which slingshot() calls)`
+
+- **In-scope output equivalence:** bounded
+- **Validated at:** `slingshot(<data sce>, clusterLabels = "seurat_clusters", reducedDim = "PCA") — all other algorithmic args left at defaults (start.clus=NULL, end.clus=NULL, dist.method="slingshot", use.median=FALSE, omega=FALSE, omega_scale=1.5, times=NULL, shrink=TRUE, extend="y", reweight=TRUE, reassign=TRUE, thresh=0.001, maxit=15, stretch=2, approx_points=NULL, smoother="smooth.spline", shrink.method="cosine", allow.breaks=TRUE)`
+- **Supported scope:** The patch replaces only the S4 method getCurves,PseudotimeOrdering (the curve-fitting stage that slingshot() invokes internally after getLineages); the lineage/MST inference stage of slingshot() (start.clus, end.clus, dist.method, use.median, omega, omega_scale, times) is NOT patched and runs upstream unchanged. fast_getCurves reimplements the full getCurves parameter surface and branches on every algorithmic argument: shrink (logical or numeric in [0,1]), extend in {"y","n","pc1"}, reweight, reassign, thresh, maxit, stretch, approx_points (NULL->150 if nrow>150 else FALSE, or explicit), smoother in {"smooth.spline","loess"}, shrink.method (passed through to slingshot's .percent_shrinkage), and allow.breaks. It handles single-lineage (L=1 -> sequential lapply), single-cluster (K=1, PCA extension), and multi-cluster branching/shrinkage. There are no NotImplementedError/stop() guards that reject any parameter value, so it nominally accepts the whole getCurves API. The benchmarked default config (shrink=TRUE, extend="y", reweight=TRUE, reassign=TRUE, smoother="smooth.spline", approx_points=NULL) is fully exercised and passes the task metric thresholds. CRITICAL CAVEAT: even within its supported scope the fast path is an APPROXIMATION, not bit-exact: (1) smooth.spline spar caching reuses the previous fit's spar across coordinate dimensions when lambda/weights match, bypassing the per-dim df-search cross-validation; (2) the smoother returns fit$y[match(lambda,fit$x)] instead of predict.smooth.spline; (3) the initial curve skeleton is resampled to approx_points BEFORE the second full-data projection (upstream projects onto the dense skeleton then resamples). These degrade pseudotime_spearman/weight_pearson below 1.0 (about 0.985 / 0.970 on the tiny tier per the audit) even at default args.
+- **Out-of-scope behavior:** ⚠ **Documented approximation.** Correct for the validated configuration below; results may differ outside it and there is no automatic fall-back, so stay within the stated scope (or deactivate the patch).
+- **Approximation details:** Only getCurves (curve fitting) is accelerated; the getLineages/MST stage of slingshot() and its args (start.clus, end.clus, dist.method, use.median, omega, omega_scale, times) run upstream and get no speedup — they are not part of the fast path. ; Not bit-exact for ANY config including defaults: spar reuse across dimensions (patch.R:88-111) bypasses smooth.spline cross-validation — silently changes spline smoothness, no guard. ; predict.smooth.spline bypass via fit$y[match(lambda,fit$x)] (patch.R:99,110) — silently different fitted values, no guard. ; Initial-skeleton resampling to approx_points before the full-data projection (patch.R:174-179, 223-228) — projects onto a COARSER initial polyline than upstream; largest divergence, no guard. ; Non-exported internals .slingParams<- (patch.R:64), .slingCurves<- (patch.R:524), .percent_shrinkage (patch.R:349) accessed via get(...,asNamespace('slingshot')) — breaks silently/loudly if slingshot refactors internals; tested only against slingshot 2.16.0. ; Parallelism (parallel::mclapply over lineages, patch.R:288-332) is macOS/Linux fork-only; on Windows .zyme_mclapply falls back to sequential lapply (no speedup) unless AUTOZYME_PARALLEL=future. ; spar cache does not feed worker results back to the parent under mclapply, so the cache is less effective across iterations (correctness unaffected, audit 1.6).
+

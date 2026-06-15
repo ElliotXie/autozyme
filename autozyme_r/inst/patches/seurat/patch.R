@@ -28,6 +28,8 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
     "FindNeighbors.Seurat", "Seurat")
   .seurat_orig_FindAllMarkers <- utils::getFromNamespace(
     "FindAllMarkers", "Seurat")
+  .seurat_orig_FindMarkers_Seurat <- utils::getFromNamespace(
+    "FindMarkers.Seurat", "Seurat")
   # Translates the seurat-zyme back-compat `turbo=` kwarg into autozyme's
   # canonical `zyme=`. Returns the effective zyme flag.
   .seurat_zyme_flag <- function(zyme, turbo) {
@@ -991,6 +993,125 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
     } else {
       fast_FindAllMarkers_fusion(object, ...)
     }
+  }
+
+  # ── FindMarkers (one-vs-rest + two-group) ────────────────────────────────
+  # Generalizes the FindAllMarkers fusion kernel to G=2 via the same compiled
+  # `parallel_all_in_one_dgc` sweep with a 2-level factor:
+  #   * ident.2 = NULL  -> one-vs-rest (ident.1 vs all other cells, full matrix)
+  #   * ident.2 = level(s) -> two-group (subset to ident.1 cells + ident.2
+  #     level(s), ident.1 vs ident.2)
+  # Bit-exact vs Seurat/presto on shared genes (validated both shapes incl.
+  # multi-level ident.2: neglog10_p spearman = 1.0, q99 |avg_log2FC| diff
+  # < 1e-15, top50 jaccard = 1.0). This also accelerates FindConservedMarkers,
+  # which calls FindMarkers per grouping.var level with an explicit ident.2.
+  # Any other shape (group.by/subset.ident/reduction/latent.vars, non-wilcox
+  # test, only.pos, non-default base/min.diff.pct/max.cells.per.ident, explicit
+  # zyme=FALSE) falls back to the original method untouched.
+  fast_FindMarkers_Seurat <- function(object, ident.1 = NULL, ident.2 = NULL,
+                                      latent.vars = NULL, group.by = NULL,
+                                      subset.ident = NULL, assay = NULL,
+                                      reduction = NULL, ...) {
+    dots <- list(...)
+    fallback <- function() {
+      .seurat_orig_FindMarkers_Seurat(
+        object = object, ident.1 = ident.1, ident.2 = ident.2,
+        latent.vars = latent.vars, group.by = group.by,
+        subset.ident = subset.ident, assay = assay, reduction = reduction, ...)
+    }
+
+    test.use     <- dots[["test.use"]]            %||% "wilcox"
+    slot         <- dots[["slot"]]                %||% "data"
+    logfc.thr    <- dots[["logfc.threshold"]]     %||% 0.1
+    min.pct      <- dots[["min.pct"]]             %||% 0.01
+    base         <- dots[["base"]]                %||% 2
+    only.pos     <- dots[["only.pos"]]            %||% FALSE
+    min.diff.pct <- dots[["min.diff.pct"]]        %||% -Inf
+    mcpi         <- dots[["max.cells.per.ident"]] %||% Inf
+    mcg          <- dots[["min.cells.group"]]     %||% 3
+    mcf          <- dots[["min.cells.feature"]]   %||% 3
+    pseudocount.use <- dots[["pseudocount.use"]]  %||% 1
+
+    unsupported <- isFALSE(dots[["zyme"]]) || isFALSE(dots[["turbo"]]) ||
+      !is.null(latent.vars) || !is.null(group.by) ||
+      !is.null(subset.ident) || !is.null(reduction) ||
+      !is.null(dots[["features"]]) || !is.null(dots[["mean.fxn"]]) ||
+      !is.null(dots[["fc.name"]]) ||
+      !identical(test.use, "wilcox") || !identical(slot, "data") ||
+      isTRUE(only.pos) || base != 2 || is.finite(mcpi) || min.diff.pct > -Inf ||
+      is.null(ident.1) || length(ident.1) != 1L ||
+      # min.cells.group is enforced here as the hard-coded `< 3` fallback below;
+      # min.cells.feature pre-filters features in stock Seurat but not here.
+      # A non-default value of either changes the result (or turns Seurat's
+      # too-few-cells stop() into a silent result), so defer to upstream.
+      !identical(as.numeric(mcg), 3) || !identical(as.numeric(mcf), 3) ||
+      # pseudocount.use feeds log() directly; a non-finite or non-scalar value
+      # would silently corrupt every fold-change. (A valid positive scalar,
+      # incl. the default 1, is supported.)
+      !is.numeric(pseudocount.use) || length(pseudocount.use) != 1L ||
+      !is.finite(pseudocount.use) || pseudocount.use <= 0
+    if (unsupported) return(fallback())
+
+    assay <- assay %||% SeuratObject::DefaultAssay(object)
+    assay.obj <- object[[assay]]
+    if (length(SeuratObject::Layers(assay.obj, search = slot)) > 1) return(fallback())
+    data.use <- SeuratObject::LayerData(object, layer = slot, assay = assay)
+    if (is.null(data.use) || !inherits(data.use, "dgCMatrix")) return(fallback())
+
+    idents <- SeuratObject::Idents(object)
+    cellnames <- colnames(data.use)
+    if (is.null(names(idents)) || !all(cellnames %in% names(idents))) return(fallback())
+    idents <- as.character(idents[cellnames])
+    if (!(as.character(ident.1) %in% idents)) return(fallback())
+
+    in1 <- idents == as.character(ident.1)
+    if (is.null(ident.2)) {
+      # one-vs-rest: ident.1 vs all other cells (full matrix)
+      gf <- factor(ifelse(in1, "x", "rest"), levels = c("x", "rest"))
+    } else {
+      # two-group: restrict to ident.1 cells + ident.2 level(s)
+      ident.2.chr <- as.character(ident.2)
+      if (!all(ident.2.chr %in% idents)) return(fallback())
+      in2 <- idents %in% ident.2.chr
+      if (any(in1 & in2)) return(fallback())  # idents must be disjoint
+      use <- in1 | in2
+      data.use <- data.use[, use, drop = FALSE]
+      gf <- factor(ifelse(in1[use], "x", "rest"), levels = c("x", "rest"))
+    }
+    gsizes <- tabulate(as.integer(gf), nbins = 2L)
+    n.1 <- gsizes[1]; n.2 <- gsizes[2]
+    if (n.1 < 3L || n.2 < 3L) return(fallback())
+
+    feature.names <- rownames(data.use)
+    n.features.total <- nrow(data.use)
+    res <- parallel_all_in_one_dgc(data.use, as.integer(gf), gsizes)
+
+    # Match FoldChange / fast_FindAllMarkers_fusion exactly: honor
+    # pseudocount.use (read + validated above) instead of hard-coding +1, and
+    # gate min.pct on the ROUNDED pct (pmax(round(count/n,3)) >= min.pct), not
+    # raw counts — raw counts are stricter at the boundary and would drop genes
+    # Seurat and the fusion path keep.
+    sums.1 <- res$sum_by_group[, 1]
+    total.sum <- res$sum_by_group[, 1] + res$sum_by_group[, 2]
+    counts.1 <- res$detected_by_group[, 1]
+    counts.2 <- res$detected_by_group[, 2]
+    fc <- log((sums.1 + pseudocount.use) / n.1, base = base) -
+          log((total.sum - sums.1 + pseudocount.use) / n.2, base = base)
+    pct.1 <- round(counts.1 / n.1, 3)
+    pct.2 <- round(counts.2 / n.2, 3)
+
+    features.use <- which(pmax(pct.1, pct.2) >= min.pct & abs(fc) >= logfc.thr)
+    if (length(features.use) == 0L) return(fallback())
+
+    out <- data.frame(
+      p_val      = res$pval_by_group[features.use, 1],
+      avg_log2FC = fc[features.use],
+      pct.1      = pct.1[features.use],
+      pct.2      = pct.2[features.use],
+      row.names  = feature.names[features.use], check.names = FALSE)
+    out <- out[order(out$p_val, -abs(out$pct.1 - out$pct.2)), , drop = FALSE]
+    out$p_val_adj <- p.adjust(out$p_val, method = "bonferroni", n = n.features.total)
+    out
   }
 
   # ── Phase 3: Python-backed patches (RunPCA, RunCCA, Integration) ─────────
@@ -2175,6 +2296,7 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
       ScaleData.Seurat                = fast_ScaleData_Seurat,
       FindNeighbors.Seurat            = fast_FindNeighbors_Seurat,
       FindAllMarkers                  = fast_FindAllMarkers,
+      FindMarkers.Seurat              = fast_FindMarkers_Seurat,
       RunPCA.StdAssay                 = fast_RunPCA_StdAssay,
       RunPCA.default                  = fast_RunPCA_default,
       RunCCA.default                  = fast_RunCCA_default,

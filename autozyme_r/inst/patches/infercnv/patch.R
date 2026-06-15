@@ -720,7 +720,14 @@ if (requireNamespace("infercnv",       quietly = TRUE) &&
       is.null(args$num_ref_groups)                        &&
       isFALSE(args$scale_data %||% FALSE)                 &&
       isFALSE(args$remove_genes_at_chr_ends %||% FALSE)   &&
-      isFALSE(args$mask_nonDE_genes %||% FALSE)
+      isFALSE(args$mask_nonDE_genes %||% FALSE)           &&
+      # Scope guard: the inline path hard-codes pyramidinal smoothing, use_bounds=TRUE
+      # ref subtraction, and a numeric clamp threshold. Non-default smooth_method,
+      # ref_subtract_use_mean_bounds=FALSE, or max_centered_threshold='auto' are not
+      # honored here, so delegate them to upstream .orig_run.
+      identical(args$smooth_method %||% "pyramidinal", "pyramidinal") &&
+      isTRUE(args$ref_subtract_use_mean_bounds %||% TRUE) &&
+      is.numeric(args$max_centered_expression %||% args$max_centered_threshold %||% 3)
     )
     if (!streamlined) {
       body_run <- .orig_run

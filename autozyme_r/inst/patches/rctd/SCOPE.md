@@ -1,0 +1,23 @@
+# autozyme `rctd` (R) — supported parameter scope
+
+This patch accelerates the function(s) below but is **validated only for a
+specific parameter envelope**. Within that envelope the fast path reproduces the
+upstream result (to the stated output-equivalence class); outside it, behavior
+is one of: falls back to upstream, raises, or — for a few documented
+approximations — silently approximates.
+
+Supported parameters (e.g. `n_comps` / `npcs`, resolution, the data itself) can
+be set freely. Only the parameters listed under each entry change behavior.
+
+_Auto-generated from `scripts/patch_scope.tsv`. Do not edit by hand — run
+`scripts/gen_scope_docs.py`._
+
+
+## `run.RCTD`
+
+- **In-scope output equivalence:** bounded
+- **Validated at:** `run.RCTD(<data RCTD object>, doublet_mode = "doublet") with set.seed(1) immediately before. The RCTD object's @config carried max_cores from the pre-built .rds (README says data files built with max_cores=1, N_fit=100, N_epoch=2); thread sweeps {1,4,8} in speedups vary mc.cores via the harness, not the call args.`
+- **Supported scope:** Accelerates ONLY the doublet-mode pixel-fitting loop reached by run.RCTD(., doublet_mode="doublet"), and the "full" mode loop (decompose_batch is patched). It patches 10 spacexr namespace internals (calc_log_l_vec, get_der_fast, solveWLS, solveIRWLS.weights, psd, process_bead_doublet, decompose_sparse, gather_results, process_beads_batch, decompose_batch) with C++/closed-form kernels. Fast C++ paths fire only for the non-bulk, non-constrained branches that fitPixels invokes (fitPixels calls process_beads_batch with constrain=F). Specifically: get_der_fast non-bulk; solveWLS p=1 (closed-form scalar Newton, exact) and p=2 (4-vertex active-set, equivalent to solve.QP for the 2x2 bound problem) only when !bulk_mode && !constrain; solveWLS p>2 non-bulk-unconstrained uses R quadprog single Newton step with the patched get_der_fast; solveIRWLS.weights non-bulk unconstrained ncol(S)>2 via rctd_cpp_irwls_full_nonbulk; decompose_sparse unconstrained p<=2 via rctd_cpp_irwls_sparse_p12; psd closed-form for 1x1 and 2x2; process_bead_doublet fused C++ candidate scoring + sparse pair refit in the !constrain branch. Full cell-type weights are reproduced exactly (pearson_weights=1.0) and small/medium/large/ood_xlarge tiers pass all thresholds on macOS and Windows. Threads {1,4,8} supported (mclapply fork on non-Windows when cores>1; PSOCK on Windows only when N>=6000 pixels, capped at 4 workers; otherwise serial). Likelihood globals Q_mat/SQ_mat/X_vals/K_val must be populated by spacexr::set_likelihood_vars (done by run.RCTD before fitPixels) before any fast_* runs.
+- **Out-of-scope behavior:** ⚠ **Documented approximation.** Correct for the validated configuration below; results may differ outside it and there is no automatic fall-back, so stay within the stated scope (or deactivate the patch).
+- **Approximation details:** doublet_mode="multi": process_beads_multi is NOT in register_patch targets — runs entirely on upstream (no speedup, but correct). ; bulk_mode=TRUE branches: get_der_fast/solveWLS/solveIRWLS.weights explicitly delegate to captured .orig_* originals (patch.R:106-108,145,151-156) — not accelerated. ; constrain=TRUE: all C++ fast solver paths are gated on !constrain; fitPixels uses constrain=F so the default doublet run hits the fast path, but any caller with constrain=TRUE silently runs the slow R fallback (correct, just slow). ; UNGUARDED APPROXIMATION (dangerous): rctd_cpp_score_sparse_candidates hardcodes an 8-iteration score-only IRWLS cap (rctd.cpp:724,734) vs upstream decompose_sparse(score_mode=TRUE) which uses 25 iterations. This is NOT bit-exact for doublet candidate scoring. ; UNGUARDED APPROXIMATION (dangerous): fast_process_bead_doublet prunes the candidate set to 6 or 7 cell types whenever >7 survive the initial full fit, using a fixed 0.025 weight cutoff (patch.R:241-246). Upstream scores all candidate pairs. Together with the 8-iter cap this makes doublet-pair selection drift — it FAILS ood_large on pearson_doublet_weights (0.9985 < 0.999 threshold per final_audit). No guard or adaptive exact fallback exists. ; Unguarded global-variable dependency: fast_* kernels resolve Q_mat/SQ_mat/X_vals/K_val by bare name; if set_likelihood_vars was not called first they error with an opaque 'object not found' (final_audit flags this; no stopifnot guard). ; rctd_cpp solver active-set QP has a hard iter<64 cap (final_audit cites rctd.cpp:408) — fine for typical p<30 cell types, not formally guaranteed for pathological inputs. ; C++ kernels contain NO stop()/throw/warning guards — they assume well-formed inputs; all validation/dispatch lives in the R wrappers.
+

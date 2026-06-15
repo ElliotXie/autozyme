@@ -8,7 +8,7 @@
 #   4. unsupported NormalizeData options fall back to upstream
 #   5. zyme=FALSE escape works (returns upstream result)
 #   6. with_disabled() escape works
-#   7. deactivate("seurat") un-patches cleanly
+#   7. restore("seurat") un-patches cleanly
 #   8. After restore, NormalizeData() == captured upstream original
 
 suppressPackageStartupMessages({
@@ -109,11 +109,11 @@ disabled_x <- LayerData(obj_block, layer = "data")
 stopifnot(identical(disabled_x, ref_x))
 cat("PASS: with_disabled() forces upstream\n")
 
-# --- 10. deactivate("seurat") un-patches ----------------------------------
-autozyme::deactivate("seurat")
+# --- 10. restore("seurat") un-patches -------------------------------------
+autozyme::restore("seurat")
 obj_after <- NormalizeData(obj, verbose = FALSE)
 after_x <- LayerData(obj_after, layer = "data")
 stopifnot(identical(after_x, ref_x))
-cat("PASS: deactivate('seurat') yields upstream\n")
+cat("PASS: restore('seurat') yields upstream\n")
 
 cat("\nALL SMOKE TESTS PASSED\n")

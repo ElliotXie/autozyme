@@ -95,6 +95,40 @@ def test_rank_genes_specific_reference_delegates(clustered_adata):
     assert type(out) is type(ref)
 
 
+def test_rank_genes_rankby_abs_full_output_matches_vanilla(clustered_adata):
+    """rankby_abs=True without n_genes must rank by |score|, like upstream.
+
+    Regression (scope audit, 2026-06-12): the full-output fast-path branch
+    sorted by signed score and ignored ``rankby_abs``, so a full-output call
+    with ``rankby_abs=True`` silently diverged from vanilla (the top-N gene
+    set per group was wrong). The top-N (n_genes) branch already honored it.
+    """
+    import autozyme
+    import numpy as np
+    import scanpy as sc
+
+    a_fast = clustered_adata.copy()
+    a_vanilla = clustered_adata.copy()
+    with autozyme.disabled():
+        sc.tl.rank_genes_groups(a_vanilla, groupby="group",
+                                method="wilcoxon", rankby_abs=True)
+    sc.tl.rank_genes_groups(a_fast, groupby="group",
+                            method="wilcoxon", rankby_abs=True)
+
+    rf = a_fast.uns["rank_genes_groups"]
+    rv = a_vanilla.uns["rank_genes_groups"]
+    for g in rf["names"].dtype.names:
+        # The sort key is |score|; it must match vanilla at every rank position.
+        sf = np.abs(np.asarray(rf["scores"][g], dtype=np.float64))
+        sv = np.abs(np.asarray(rv["scores"][g], dtype=np.float64))
+        np.testing.assert_allclose(sf, sv, rtol=0, atol=1e-5)
+        # And the actual top-N ranked gene sets must agree.
+        k = min(20, len(sf))
+        top_f = set(np.asarray(rf["names"][g])[:k])
+        top_v = set(np.asarray(rv["names"][g])[:k])
+        assert top_f == top_v, f"group {g}: top-{k} gene set diverged"
+
+
 def test_rank_genes_zyme_false_delegates(clustered_adata):
     import scanpy as sc
 

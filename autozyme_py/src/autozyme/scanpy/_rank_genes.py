@@ -611,7 +611,11 @@ def _fast_rank_genes_groups(
                 # adata.uns['rank_genes_groups']['names'][group][:N] returns top-N).
                 # Without this sort, the recarray stored names in var_names order
                 # and downstream slicing returned random low-expression genes.
-                sort_idx = np.argsort(-all_scores[i], kind=sort_kind)
+                # Honor rankby_abs here exactly as the n_genes (top-N) branch does
+                # above; otherwise a full-output call with rankby_abs=True silently
+                # ranked by signed score instead of |score|, diverging from vanilla.
+                sort_key = np.abs(all_scores[i]) if rankby_abs else all_scores[i]
+                sort_idx = np.argsort(-sort_key, kind=sort_kind)
                 names_arr[gn] = var_names_np[sort_idx]
                 scores_arr[gn] = all_scores[i][sort_idx]
                 pvals_arr[gn] = all_pvals[i][sort_idx]

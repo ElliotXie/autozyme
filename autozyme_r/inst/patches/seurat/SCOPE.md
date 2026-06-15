@@ -1,0 +1,72 @@
+# autozyme `seurat` (R) — supported parameter scope
+
+This patch accelerates the function(s) below but is **validated only for a
+specific parameter envelope**. Within that envelope the fast path reproduces the
+upstream result (to the stated output-equivalence class); outside it, behavior
+is one of: falls back to upstream, raises, or — for a few documented
+approximations — silently approximates.
+
+Supported parameters (e.g. `n_comps` / `npcs`, resolution, the data itself) can
+be set freely. Only the parameters listed under each entry change behavior.
+
+_Auto-generated from `scripts/patch_scope.tsv`. Do not edit by hand — run
+`scripts/gen_scope_docs.py`._
+
+
+## `Seurat::FindAllMarkers`
+
+- **In-scope output equivalence:** bit_exact
+- **Validated at:** `Seurat::FindAllMarkers(object = <data>, verbose = FALSE)`
+- **Supported scope:** The shipped default path (fast_FindAllMarkers_fusion) computes a Wilcoxon-rank-sum (normal-approximation, presto-style) marker test per cluster-vs-rest using a single fused RcppParallel C++ kernel. It is taken ONLY when ALL of these hold (gate at patch.R:466-480): zyme/turbo enabled (default TRUE); test.use=='wilcox'; slot=='data'; features is NULL (all features); node is NULL; latent.vars is NULL; mean.fxn is NULL; fc.name is NULL; only.pos is FALSE; densify is FALSE; max.cells.per.ident is Inf; min.diff.pct == -Inf; base == 2; no extra (...) args (length(dots)==0); group.by is NULL or 'ident'. Additional runtime guards fall back to upstream: data layer must be a single (joined) dgCMatrix (patch.R:487-493), and Idents() must name all cells (patch.R:499-501). Within that gate, the fast path DOES honor user-supplied values of the args it actually consumes: logfc.threshold (default 0.1, used at :570), min.pct (default 0.01, used at :569), return.thresh (default 1e-2, used at :587), min.cells.group (default 3, used at :561 to skip small clusters), assay, and base (only base==2). Per-cluster small-group skipping matches Seurat behavior (warn+skip rare clusters rather than global fallback). p-value adjustment is Bonferroni over n.features. This matches the benchmarked call (object + verbose=FALSE = all defaults) exactly, so the benchmark exercises the supported fast path.
+- **Out-of-scope behavior:** ⚠ **Documented approximation.** Correct for the validated configuration below; results may differ outside it and there is no automatic fall-back, so stay within the stated scope (or deactivate the patch).
+- **Approximation details:** see above
+
+## `Seurat::FindNeighbors`
+
+- **In-scope output equivalence:** bit_exact
+- **Validated at:** `FindNeighbors(object = <data>, reduction = "pca", dims = 1:30, k.param = 20L, compute.SNN = TRUE, prune.SNN = 1/15, nn.method = "annoy", n.trees = 50L, annoy.metric = "euclidean", verbose = FALSE). Declared task.yaml signature is the narrower Seurat::FindNeighbors(object = obj, dims = 1:30, verbose = FALSE); all other run.R args equal upstream defaults.`
+- **Supported scope:** Fast path is taken only for: a Seurat object (inherits "Seurat"), nn.method == "annoy", annoy.metric == "euclidean", return.neighbor == FALSE, l2.norm == FALSE, and the zyme flag TRUE (lines 373-376). On that path it builds an Annoy Euclidean index from Embeddings(object[[reduction]])[, dims] in C++ (single-threaded build, std::thread-parallel k-NN search over OMP_NUM_THREADS / detectCores), then constructs the NN sparse Graph and, when compute.SNN is TRUE, the SNN graph via Seurat:::ComputeSNN(prune = prune.SNN). Correctly honored args: reduction (any reduction present in the object), dims (any column subset that exists), k.param, n.trees, prune.SNN, compute.SNN, graph.name, verbose. Equivalence is approximate-only: the metric is knn_jaccard >= 0.85, not bit-exact (Annoy is approximate and the kernel casts to float32). This covers the benchmarked default Annoy/Euclidean graph configuration.
+- **Out-of-scope behavior:** Out-of-scope parameters **fall back to the upstream implementation** (correct result, no speedup).
+
+## `Seurat::FindVariableFeatures`
+
+- **In-scope output equivalence:** bit_exact
+- **Validated at:** `FindVariableFeatures(object = <data>, selection.method = "vst", nfeatures = 2000, verbose = FALSE)`
+- **Supported scope:** Fast path is correct only for the upstream-default VST selection on a v5 Assay5 with a unified "counts" layer. Concretely, the entry-point method fast_FindVariableFeatures_Seurat takes the fast route when: zyme/turbo TRUE (default) AND selection.method == "vst" AND the resolved assay inherits "Assay5" AND it has a "counts" layer (L254, L270-271). It honors loess.span (passed as span) and clip.max (passed as clip, "auto" -> NULL -> vmax=sqrt(n_cells)); nfeatures controls top-N selection. The kernel (fast_VST_dgCMatrix, L152-196) computes per-row mean/variance over the counts dgCMatrix via a parallel C++ pass, fits log-var~log-mean with stats:::simpleLoess (span, degree 2), standardizes/clips, and picks the top-nselect by standardized variance. Correctness is approximate (HVG overlap, comparator gte 0.95 hvg_jaccard), not bit-exact, because it substitutes stats:::simpleLoess for the upstream loess() call and HVG order can drift around ties / loess-boundary (manifest L157-168). This exactly matches the benchmarked call (selection.method="vst", nfeatures=2000, all other VST args default).
+- **Out-of-scope behavior:** Out-of-scope parameters **fall back to the upstream implementation** (correct result, no speedup).
+
+## `Seurat::IntegrateLayers`
+
+- **In-scope output equivalence:** tolerance
+- **Validated at:** `Seurat::IntegrateLayers(object = <data>, method = CCAIntegration, orig.reduction = "pca", new.reduction = "integrated.cca", verbose = FALSE)`
+- **Supported scope:** The benchmarked entry point Seurat::IntegrateLayers(method = CCAIntegration) runs stock Seurat and dispatches into the patched method chain. Correct/supported combination: method = CCAIntegration with the default CCA pipeline (reduction = "cca", normalization.method = "LogNormalize"), default integration biology (anchor.features=2000, dims=1:30, k.anchor=5, k.filter, k.score, k.weight=100, l2.norm=TRUE, scale=TRUE), Seurat v5 object with split RNA layers and a "pca" reduction present, and Python (numpy+scipy with PROPACK svds) available. On macOS the RunCCA fast path additionally requires the threadpoolctl thread-guard. The shipped patch restored upstream n.trees=50 in both FindIntegrationAnchors and FindWeights (the silent n.trees=10 speed shortcut present in the task-local pipeline/run.R was removed), and CCAIntegration now forwards caller-supplied dims and k.weight to upstream exactly. Equivalence is numerical-approximation, not bit-exact: RunCCA.default replaces base::svd with scipy svds (solver=propack) on a float32 cross-product; measured min_cc_cor >= 0.9993 and cc_dim_cor_mean >= 0.9996 across all six datasets at threads=1, well above the 0.90 task thresholds.
+- **Out-of-scope behavior:** Out-of-scope parameters **fall back to the upstream implementation** (correct result, no speedup).
+
+## `Seurat::NormalizeData`
+
+- **In-scope output equivalence:** bit_exact
+- **Validated at:** `obj <- NormalizeData(object = <data>, normalization.method = "LogNormalize", scale.factor = 10000, margin = 1, verbose = FALSE)  # task.yaml declared signature: Seurat::NormalizeData(object = obj, verbose = FALSE)`
+- **Supported scope:** Fast path handles LogNormalize column normalization on a Seurat v5 object whose target assay is an Assay5/StdAssay with a single "counts" layer, producing the default "data" layer. It is gated to: zyme/turbo TRUE; normalization.method exactly "LogNormalize"; scale.factor a finite numeric scalar (length 1); margin a finite numeric scalar == 1; block.size NULL; no extra dot arguments (length(...)==0); assay NULL or a single non-NA character assay name that exists; assay inherits StdAssay with layers/cells/features slots; Layers(search="counts") returns exactly "counts"; counts layer non-null and coercible to dgCMatrix. Algorithm: per column, col_sum = sum of nonzero entries (equals full column total for sparse counts), then x := fast_log1p(x * scale.factor/col_sum); columns with col_sum<=0 left untouched (matches upstream zero-column behavior). It writes the data layer and adds the "data" column to the cells/features LogMaps, then runs LogSeuratCommand. Numeric equivalence is exact within ~1e-5 (the fast_log1p polynomial approximation has ~1.8e-11 max abs error, far inside the task's max_rel_err<=0.01 / data_cor>=0.999 gates).
+- **Out-of-scope behavior:** Out-of-scope parameters **fall back to the upstream implementation** (correct result, no speedup).
+
+## `Seurat::RunPCA`
+
+- **In-scope output equivalence:** tolerance
+- **Validated at:** `Seurat::RunPCA(object = <data>, npcs = 50, verbose = FALSE)  — where <data> is a Seurat object scaled to 2000 variable features; dispatches to RunPCA.StdAssay with features = NULL (=> VariableFeatures), layer = "scale.data", rev.pca = FALSE, weight.by.var = TRUE, approx = TRUE, seed.use = 42. (The standalone experiment run.R additionally passes features=VariableFeatures(obj), npcs=50L, rev.pca=FALSE, weight.by.var=TRUE, seed.use=42L, approx=TRUE — all upstream defaults.)`
+- **Supported scope:** The fast path computes PCA via a Gram-matrix eigendecomposition in Python (numpy/scipy via reticulate) and is correct (embeddings/loadings/stdev close up to sign) only for the upstream-default configuration: rev.pca = FALSE, weight.by.var = TRUE OR FALSE (both handled — FALSE divides embeddings by singular values, line 1107), seed.use any (set.seed honored), npcs <= nrow-1 (clamped, line 1070). Input (object passed to .default) must be a dense matrix or convertible-to-dense float64 array of features x cells that is ALREADY mean-centered (i.e. scale.data), with all requested features present and of nonzero variance. The StdAssay (Seurat-object) entry requires layer = 'scale.data' to actually be present/centered, and features that are a subset of the layer's features. Python with numpy+scipy must be importable. On Darwin it uses numpy.linalg.eigh (full) + slice; elsewhere scipy.linalg.eigh partial (driver='evr'); both yield the same supported result. This exactly covers the benchmarked default call.
+- **Out-of-scope behavior:** Out-of-scope parameters **fall back to the upstream implementation** (correct result, no speedup).
+
+## `Seurat::ScaleData`
+
+- **In-scope output equivalence:** bit_exact
+- **Validated at:** `Seurat::ScaleData(object = <data>, verbose = FALSE)  — where <data> is a v5 Seurat object whose RNA assay has a "data" layer (dgCMatrix) and VariableFeatures set to 2000 HVF (prepare_with_hvf(..., nfeatures=2000L)). All algorithmic args left at upstream defaults: features=NULL, assay=NULL, vars.to.regress=NULL, split.by=NULL, model.use="linear", use.umi=FALSE, do.scale=TRUE, do.center=TRUE, scale.max=10, block.size=1000, min.cells.to.block=3000. (The legacy run.R additionally passes features=VariableFeatures(obj), do.scale=TRUE, do.center=TRUE, scale.max=10, block.size=1000 explicitly, but all equal upstream defaults.)`
+- **Supported scope:** Fast path (turbo_scale_sparse_full) handles the canonical default per-feature z-scaling: a v5 Seurat object (Assay5) with a unified "data" layer that is a dgCMatrix, scaling+centering every selected feature globally over all cells. All of these must hold simultaneously: vars.to.regress=NULL, split.by=NULL, model.use=="linear", use.umi=FALSE, do.scale=TRUE, do.center=TRUE (all guarded at patch.R:301-303). features may be NULL (resolves to VariableFeatures, else rownames, matching upstream ScaleData.Assay) or an explicit subset; assay may be NULL (DefaultAssay) or named. scale.max is honored and applied as a POSITIVE-tail-only cap (kernel lines 53,69), matching Seurat's FastSparseRowScale. Variance uses the n-1 (sample) denominator; zero-variance features get sd=1 (kernel lines 45-47), matching Seurat. Result is materialized as a dense features x cells matrix and written to the scale.data layer with the cells/features metadata flags updated (patch.R:343-353). The task's correctness gate is gene_cor_min >= 0.99 (not bit-exact), consistent with this numeric-close contract.
+- **Out-of-scope behavior:** Out-of-scope parameters **fall back to the upstream implementation** (correct result, no speedup).
+
+## `Seurat::SCTransform`
+
+- **In-scope output equivalence:** tolerance
+- **Validated at:** `Two benchmark harnesses, both default-v2: (1) optimized_task run.R (run.R:842-848): SCTransform(object=<data>, assay="RNA", new.assay.name="SCT", vst.flavor="v2", do.correct.umi=TRUE, ncells=5000, variable.features.n=3000, variable.features.rv.th=1.3, do.scale=FALSE, do.center=TRUE, conserve.memory=FALSE, return.only.var.genes=TRUE, seed.use=42L, verbose=FALSE) (2) shipped attest smoke.R (v1/attest/smoke.R:17-18, matches task.yaml signature line 4): Seurat::SCTransform(<data>, verbose=FALSE, vst.flavor="v2", seed.use=1448145L) Both reduce to all-algorithmic-defaults on a standard RNA counts assay.`
+- **Supported scope:** Fast path runs ONLY for the upstream-default v2 SCTransform config on a standard sparse RNA counts assay. The gate .seurat_sct_supported_default_path (patch.R:1526-1560) requires ALL of: reference.SCT.model=NULL; do.correct.umi=TRUE; ncells numeric/finite/>0; residual.features=NULL; variable.features.n numeric/finite/>0; variable.features.rv.th identical to 1.3; vars.to.regress=NULL; latent.data=NULL; do.scale=FALSE; do.center=TRUE; clip.range exactly equal to the default c(-sqrt(ncol/30), sqrt(ncol/30)) (all.equal, patch.R:1515-1524); vst.flavor identical to 'v2'; conserve.memory=FALSE; return.only.var.genes=TRUE; and ZERO extra ... arguments (length(extra_args)==0). Each of these is also the upstream Seurat 5.4.0 default, so the benchmarked call is squarely inside the fast path. For SCTransform.Seurat, additionally requires a single non-SCT assay name (patch.R:2023). The fast .default reconstructs Pearson residual mean/variance and corrected UMIs via Rcpp kernels (turbo_csc_to_csr / turbo_stats_correct_sparse / turbo_fused_resid_center_sparse) assuming the y~log_umi model with min_variance='umi_median' (the v2 contract).
+- **Out-of-scope behavior:** Out-of-scope parameters **fall back to the upstream implementation** (correct result, no speedup).
+

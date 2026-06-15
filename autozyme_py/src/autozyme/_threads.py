@@ -141,11 +141,5 @@ def safe_set_num_threads(n: int) -> int:
     try:
         nb.set_num_threads(target)
         return target
-    except (RuntimeError, ValueError):
-        # RuntimeError: the pool is already locked at a different count.
-        # ValueError: target is outside [1, NUMBA_NUM_THREADS] (an over-request
-        # when OMP/env asks for more threads than the pool max). In both cases
-        # the count stays at `current` and the kernel still runs correctly --
-        # in a fresh process `current` is the pool max, so this clamps an
-        # over-request to the max. Normal configs (target <= max) never raise.
+    except RuntimeError:
         return current

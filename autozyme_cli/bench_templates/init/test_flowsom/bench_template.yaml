@@ -1,0 +1,18 @@
+name: test_flowsom
+stage: init
+source_task: /Users/xie227/autozyme_mac/test_autopilotmode/test_flowsom
+source_task_name: test_flowsom
+source_commit: 6dc8dcb606fb3ab9e04ef9c494958788c1857725
+source_commit_short: 6dc8dcb6
+source_commit_message: "zyme init: test_flowsom"
+restore_point: init
+registered_at: "2026-06-14T14:26:02"
+framework_sha: e56c9c09789a0374077b4a249e84c6a8f22dbef9
+copied_state_dirs:
+  - reference_outputs
+memory_policy: fresh_skeleton
+symlink_sources:
+  data: /Users/xie227/autozyme_mac/test_autopilotmode/test_flowsom/data
+upstream_repo:
+  clone_url: "https://github.com/SofieVG/FlowSOM"
+  commit: 56892b583a0dbae5535665e45290ffce355bd503

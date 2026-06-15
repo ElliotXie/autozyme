@@ -90,11 +90,7 @@ def tier_dataset_map_from_task_yaml(task_yaml: Path) -> dict[str, str]:
         return {}
     try:
         task = yaml.safe_load(task_yaml.read_text(encoding="utf-8")) or {}
-    except (OSError, ValueError, yaml.YAMLError):
-        # yaml.safe_load raises yaml.YAMLError (NOT a ValueError) on malformed
-        # YAML; catch it so a bad task.yaml returns {} as the docstring promises.
-        return {}
-    if not isinstance(task, dict):
+    except (OSError, ValueError):
         return {}
     out: dict[str, str] = {}
     for ds in task.get("datasets") or []:
@@ -316,18 +312,24 @@ def row_is_sentinel(row: dict[str, str]) -> bool:
     return (not sec) and (not variant) and tier in TIERS and bool(note)
 
 
+# Canonical OOM-signature set. Three runtimes use it and can't share a literal
+# (this CLI, the R package's verify.R, the Python package's _verify.py), so they
+# are kept consistent by hand. The real recognition contract is the "oom" TAG:
+# the writers (.classify_oom_note / _classify_oom_note) PREPEND "oom" to every
+# OOM note and this reader matches it, so a tagged row is recognized no matter
+# what raw signature triggered it. The raw signatures below (everything after
+# "oom") are the secondary net for untagged / legacy notes; mirror that raw set
+# verbatim in verify.R::.classify_oom_note and _verify.py::_classify_oom_note.
 _OOM_NOTE_PATTERNS = (
-    "oom",
+    "oom",              # the tag writers prepend — primary recognition contract
     "out of memory",
     "memory limit",
     "cannot allocate",
     "bad_alloc",
     "bad allocation",
-    "exited -9",
-    "subprocess exited -9",
+    "exited -9",        # also matches "subprocess exited -9"
     "sigkill",
-    "killed",
-    "killed-by-mem-watchdog",
+    "killed",           # also matches "killed-by-mem-watchdog"
 )
 
 

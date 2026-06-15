@@ -39,13 +39,8 @@ if HAS_NUMBA:
     def _hvg_one_pass(data, indices, indptr, n_cols, n_rows, n_bins, n_threads):
         """Single-pass per-column sum + sum-of-squares; closed-form variance."""
 
-        # Size per-thread buffers by the live pool, not the n_threads arg:
-        # get_thread_id() can range up to get_num_threads(), so a caller
-        # passing a smaller n_threads would otherwise index out of bounds.
-        # The extra rows stay all-zero, so the reduction below is unchanged.
-        n_buf = numba.get_num_threads()
-        local_sum = np.zeros((n_buf, n_cols), dtype=np.float64)
-        local_sumsq = np.zeros((n_buf, n_cols), dtype=np.float64)
+        local_sum = np.zeros((n_threads, n_cols), dtype=np.float64)
+        local_sumsq = np.zeros((n_threads, n_cols), dtype=np.float64)
 
         for row in prange(n_rows):
             tid = numba.get_thread_id()
@@ -66,7 +61,7 @@ if HAS_NUMBA:
         for j in range(n_cols):
             s = 0.0
             ss = 0.0
-            for t in range(n_buf):
+            for t in range(n_threads):
                 s += local_sum[t, j]
                 ss += local_sumsq[t, j]
             m = s * inv_n
@@ -151,13 +146,9 @@ if HAS_NUMBA:
     ):
         """Compute per-batch/overall mean/variance and optional count-data check."""
         n_rows = indptr.shape[0] - 1
-        # Size per-thread buffers by the live pool, not the n_threads arg:
-        # get_thread_id() can range up to get_num_threads(), so a smaller
-        # n_threads would index out of bounds. Extra rows stay all-zero.
-        n_buf = numba.get_num_threads()
-        local_sum = np.zeros((n_buf, n_batches, n_cols), dtype=np.float64)
-        local_sumsq = np.zeros((n_buf, n_batches, n_cols), dtype=np.float64)
-        local_bad_values = np.zeros(n_buf, dtype=np.uint8)
+        local_sum = np.zeros((n_threads, n_batches, n_cols), dtype=np.float64)
+        local_sumsq = np.zeros((n_threads, n_batches, n_cols), dtype=np.float64)
+        local_bad_values = np.zeros(n_threads, dtype=np.uint8)
 
         for row in prange(n_rows):
             tid = numba.get_thread_id()
@@ -174,7 +165,7 @@ if HAS_NUMBA:
         col_sum = np.zeros((n_batches, n_cols), dtype=np.float64)
         col_sumsq = np.zeros((n_batches, n_cols), dtype=np.float64)
         has_bad_values = False
-        for tid in range(n_buf):
+        for tid in range(n_threads):
             if local_bad_values[tid] != 0:
                 has_bad_values = True
             for b in range(n_batches):
@@ -223,12 +214,8 @@ if HAS_NUMBA:
     ):
         """Compute clipped sums and squared sums for all batches."""
         n_rows = indptr.shape[0] - 1
-        # Size per-thread buffers by the live pool, not the n_threads arg:
-        # get_thread_id() can range up to get_num_threads(), so a smaller
-        # n_threads would index out of bounds. Extra rows stay all-zero.
-        n_buf = numba.get_num_threads()
-        local_sum = np.zeros((n_buf, n_batches, n_cols), dtype=np.float64)
-        local_sumsq = np.zeros((n_buf, n_batches, n_cols), dtype=np.float64)
+        local_sum = np.zeros((n_threads, n_batches, n_cols), dtype=np.float64)
+        local_sumsq = np.zeros((n_threads, n_batches, n_cols), dtype=np.float64)
 
         for row in prange(n_rows):
             tid = numba.get_thread_id()
@@ -244,7 +231,7 @@ if HAS_NUMBA:
 
         out_sum = np.zeros((n_batches, n_cols), dtype=np.float64)
         out_sumsq = np.zeros((n_batches, n_cols), dtype=np.float64)
-        for tid in range(n_buf):
+        for tid in range(n_threads):
             for b in range(n_batches):
                 for col in range(n_cols):
                     out_sum[b, col] += local_sum[tid, b, col]

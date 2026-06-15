@@ -5,6 +5,7 @@ so cli.py can do `from zyme.commands import cmd_*` unchanged.
 """
 from zyme.commands.init import cmd_init
 from zyme.commands.init_check import cmd_init_check
+from zyme.commands.init_attest import cmd_init_attest
 from zyme.commands.baseline import (
     cmd_record_baseline, cmd_reference, cmd_record_noise, cmd_promote_baseline,
     cmd_baseline_list, cmd_baseline_show,
@@ -54,7 +55,7 @@ from zyme.commands.package import (
 )
 
 __all__ = [
-    "cmd_init", "cmd_init_check",
+    "cmd_init", "cmd_init_check", "cmd_init_attest",
     "cmd_record_baseline", "cmd_reference", "cmd_record_noise", "cmd_promote_baseline",
     "cmd_baseline_list", "cmd_baseline_show", "cmd_baseline_rebench",
     "cmd_run", "cmd_dryrun", "cmd_accept", "cmd_reject", "cmd_rollback", "cmd_iterate",

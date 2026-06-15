@@ -269,6 +269,16 @@ def fast_predict_log_partial_hazard(self, X):
     if isinstance(X, pd.Series):
         return _orig_pred_log(self, X)
     if isinstance(X, pd.DataFrame):
+        # Scope guard: the fast path selects raw columns X[hazard_names], which
+        # is only valid when the model's design columns ARE raw columns of X. A
+        # formula with derived terms (interactions x0:x1, transforms like
+        # scale()/np.log(), categorical expansion) makes hazard_names
+        # formula-regressor names absent from X, so X[hazard_names] KeyErrors.
+        # Because fit() calls predict_partial_hazard() internally for the
+        # concordance index, that KeyError would crash fit() outright. Defer to
+        # the formula-aware upstream whenever the design is not raw columns.
+        if not hazard_names.isin(X.columns).all():
+            return _orig_pred_log(self, X)
         Xv = X[hazard_names].values
         if Xv.dtype != np.float64:
             Xv = Xv.astype(np.float64)

@@ -1076,6 +1076,33 @@ def _tier_dataset_map(task_dir: str) -> dict[str, str]:
     return out
 
 
+# Raw OOM signatures used to detect-and-tag a crash note. Verbatim mirror of the
+# raw set in zyme.parsers.package_verify_tsv._OOM_NOTE_PATTERNS (everything after
+# its leading "oom" tag) and verify.R::.classify_oom_note's oom_pats. Keep the
+# three in sync; "oom" is not listed here because _classify_oom_note prepends it
+# (and short-circuits already-tagged notes).
+_OOM_NOTE_WRITE_PATTERNS = (
+    "out of memory", "memory limit", "cannot allocate", "bad_alloc",
+    "bad allocation", "exited -9", "sigkill", "killed",
+)
+
+
+def _classify_oom_note(note: str) -> str:
+    """Prefix a crash sentinel note that carries an OOM signature with a concise
+    ``oom (baseline|patched): `` tag (the raw worker error otherwise renders as
+    bare NA columns in pv.tsv). The full cause is preserved after the tag."""
+    if not note:
+        return note
+    low = note.lower()
+    if low.startswith("oom"):  # already tagged
+        return note
+    if not any(p in low for p in _OOM_NOTE_WRITE_PATTERNS):
+        return note
+    variant = (" (baseline)" if "activate=false" in low
+               else " (patched)" if "activate=true" in low else "")
+    return f"oom{variant}: {note}"
+
+
 def _append_package_verify_tsv(task_dir: str, name: str,
                                 rows: list[dict[str, Any]]) -> None:
     """Write per-rep × variant rows to <task_dir>/package_verify.tsv.
@@ -1177,7 +1204,7 @@ def _append_package_verify_tsv(task_dir: str, name: str,
     new_rows: list[dict[str, str]] = []
     for r in rows:
         tier = r.get("tier") or ""
-        note = r.get("note") or ""
+        note = _classify_oom_note(r.get("note") or "")
         baseline_secs = r.get("baseline_secs") or []
         patched_secs = r.get("patched_secs") or []
         baseline_peaks = r.get("baseline_peaks_mb") or []

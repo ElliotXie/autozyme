@@ -33,6 +33,8 @@ import torch
 import pyro
 import pyro.distributions
 
+import inspect
+
 import cell2location
 import cell2location.models._cell2location_module as _cm
 
@@ -45,6 +47,30 @@ from autozyme._utils import resolve_dataset_path
 # Resolve the long PyroModule class once, capture the upstream forward.
 _LocModel = _cm.LocationModelLinearDependentWMultiExperimentLocationBackgroundNormLevelGeneAlphaPyroModel
 _orig_forward = _LocModel.forward
+
+# Delegate guard for Cell2location.train: fast_forward caches lgamma(value+1)
+# keyed on the counts tensor's data_ptr(), valid only when each data_ptr always
+# holds the same counts. Under minibatch SVI (batch_size set) PyTorch reuses
+# buffer storage for different minibatch contents across steps, so the cache goes
+# stale (lgamma of minibatch A applied to minibatch B) -> wrong likelihood and
+# posterior. cell2location's own train default is batch_size=None (full-batch),
+# which keeps the cache valid; only an explicit batch_size triggers the bug.
+_orig_train = cell2location.models.Cell2location.train
+_train_sig = inspect.signature(_orig_train)
+
+
+def guarded_train(self, *args, **kwargs):
+    import autozyme as _az
+    try:
+        bound = _train_sig.bind(self, *args, **kwargs)
+        bound.apply_defaults()
+        batch_size = bound.arguments.get("batch_size", None)
+    except TypeError:
+        batch_size = kwargs.get("batch_size", None)
+    if batch_size is not None:
+        with _az.disabled():
+            return _orig_train(self, *args, **kwargs)
+    return _orig_train(self, *args, **kwargs)
 
 # Cache for lgamma(value+1) keyed by tensor identity — value=x_data is
 # constant across all training epochs.
@@ -361,6 +387,7 @@ register_patch(
         ("pyro.distributions.conjugate.GammaPoisson", "log_prob", fast_gp_log_prob),
         (f"cell2location.models._cell2location_module.{_LocModel.__name__}",
          "forward", fast_forward),
+        ("cell2location.models.Cell2location", "train", guarded_train),
     ],
     smoke={"load": _smoke_load, "call": _smoke_call, "save": _smoke_save},
     tested_against="cell2location 0.1.5",

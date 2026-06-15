@@ -92,11 +92,6 @@ def _check_list_mul(node: ast.BinOp) -> dict | None:
         list_side, other_side = node.right, node.left
     else:
         return None
-    # The other operand must be a scalar-like multiplier `N`, not itself a
-    # list/tuple literal: `[a] * [b]` is not the "replicate a list N times"
-    # pattern this detector targets, so don't flag it.
-    if isinstance(other_side, (ast.List, ast.Tuple)):
-        return None
     if len(list_side.elts) != 1:
         return None
     elt = list_side.elts[0]
@@ -202,11 +197,7 @@ def _check_target_loop(node: ast.For) -> dict | None:
 # R regex checks (partial coverage — flags the obvious patterns)
 # ----------------------------------------------------------------------------
 
-# First arg allows one level of nested parens so `rep(readRDS('a.rds'), 7)`
-# (a function-call first argument) is detected, not just a bare symbol.
-_R_REP_PATTERN = re.compile(
-    r"\brep\s*\(\s*([^,()]*(?:\([^()]*\)[^,()]*)?)\s*,\s*(?:times\s*=\s*)?(\d+)\s*\)"
-)
+_R_REP_PATTERN = re.compile(r"\brep\s*\(\s*([^,()]+?)\s*,\s*(?:times\s*=\s*)?(\d+)\s*\)")
 _R_REPLICATE_PATTERN = re.compile(r"\breplicate\s*\(\s*(\d+)\s*,")
 
 

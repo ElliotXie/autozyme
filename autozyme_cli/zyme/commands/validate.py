@@ -391,7 +391,7 @@ def _extract_assistant_text(raw_line: str, agent: str) -> str:
 # Matches: "### Finding 1 — LIKELY_HACK — Cat C - timer hoist"
 # Also tolerates ASCII '-' as separator and missing surrounding whitespace.
 _FINDING_HEADER = re.compile(
-    r"^###\s+Finding\s+(\d+)\s*[—\-–]+\s*([A-Za-z_]+)\s*[—\-–]+\s*(.+?)\s*$",
+    r"^###\s+Finding\s+(\d+)\s*[—\-–]+\s*([A-Z_]+)\s*[—\-–]+\s*(.+?)\s*$",
     re.MULTILINE,
 )
 
