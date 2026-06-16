@@ -31,8 +31,7 @@ if (requireNamespace("clusterProfiler", quietly = TRUE) &&
     requireNamespace("DOSE",            quietly = TRUE) &&
     requireNamespace("GOSemSim",        quietly = TRUE) &&
     requireNamespace("AnnotationDbi",   quietly = TRUE) &&
-    requireNamespace("GO.db",           quietly = TRUE) &&
-    requireNamespace("yaml",            quietly = TRUE)) {
+    requireNamespace("GO.db",           quietly = TRUE)) {
 
   # Originals + internal helpers captured via getFromNamespace. The fast
   # functions reference them via lexical closure — no environment(fast_) <-

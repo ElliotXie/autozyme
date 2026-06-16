@@ -377,7 +377,7 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
                     identical(annoy.metric, "euclidean") &&
                     isFALSE(return.neighbor) && isFALSE(l2.norm) &&
                     # Scope guard (additive): the fast path always builds the graph
-                    # from Embeddings(reduction)[, dims] with a fixed annoy search,
+                    # from Embeddings(reduction)[, dims] with a fixed Euclidean search,
                     # so params it does not honor fall back to upstream rather than
                     # being silently ignored. All default values pass unchanged.
                     is.null(features) && !is.null(dims) &&
@@ -393,12 +393,22 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
         l2.norm = l2.norm, cache.index = cache.index, ...))
     }
     assay <- SeuratObject::DefaultAssay(object[[reduction]])
-    data.use <- SeuratObject::Embeddings(object[[reduction]])[, dims]
+    data.use <- SeuratObject::Embeddings(object[[reduction]])[, dims, drop = FALSE]
     cell.names <- rownames(data.use); n.cells <- nrow(data.use)
-    n.cores <- max(1L, as.integer(Sys.getenv(
-      "OMP_NUM_THREADS", parallel::detectCores())))
+    n.cores <- suppressWarnings(as.integer(Sys.getenv(
+      "OMP_NUM_THREADS", unset = NA_character_)))
+    if (is.na(n.cores) || n.cores < 1L) {
+      n.cores <- parallel::detectCores()
+    }
+    n.cores <- max(1L, as.integer(n.cores))
 
-    nn.idx <- turbo_annoy_build_search(data.use, k.param, n.trees, n.cores)
+    backend <- tolower(Sys.getenv(
+      "AUTOZYME_SEURAT_FINDNEIGHBORS_BACKEND", unset = "exact"))
+    if (backend %in% c("annoy", "turbo_annoy")) {
+      nn.idx <- turbo_annoy_build_search(data.use, k.param, n.trees, n.cores)
+    } else {
+      nn.idx <- seurat_exact_knn_f32(data.use, k.param, n.cores)
+    }
 
     j <- as.numeric(t(nn.idx))
     i <- rep(seq_len(n.cells), each = k.param)
@@ -2351,13 +2361,242 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
     "SCTransform.Seurat", "Seurat")
   .seurat_orig_SCTransform_default <- utils::getFromNamespace(
     "SCTransform.default", "Seurat")
+  .seurat_orig_RunUMAP_Seurat <- utils::getFromNamespace(
+    "RunUMAP.Seurat", "Seurat")
+
+  # ── RunUMAP.Seurat ──────────────────────────────────────────────────────
+
+  .seurat_runumap_threads <- function() {
+    tryCatch(auto_threads(cap = 16L), error = function(e) 1L)
+  }
+
+  .seurat_runumap_equal_scalar <- function(x, y) {
+    length(x) == 1L && !is.na(x) && identical(as.character(x), as.character(y))
+  }
+
+  .seurat_runumap_default_epochs <- function(n_cells, n_epochs) {
+    if (!is.null(n_epochs)) return(as.integer(n_epochs))
+    if (n_cells <= 10000L) 500L else 200L
+  }
+
+  .seurat_runumap_normalize_rows <- function(X) {
+    norms <- sqrt(rowSums(X * X))
+    norms[!is.finite(norms) | norms == 0] <- 1
+    X / norms
+  }
+
+  .seurat_runumap_sort_knn <- function(idx, dist) {
+    for (i in seq_len(nrow(idx))) {
+      ord <- order(dist[i, ], method = "radix")
+      idx[i, ] <- idx[i, ord]
+      dist[i, ] <- dist[i, ord]
+    }
+    list(idx = idx, dist = dist)
+  }
+
+  .seurat_runumap_graph_inputs <- function(graph, n_epochs) {
+    coo <- methods::as(graph, "TsparseMatrix")
+    weights <- as.numeric(coo@x)
+    head <- as.integer(coo@i)
+    tail <- as.integer(coo@j)
+    if (length(weights) > 0L) {
+      default_epochs <- if (nrow(graph) <= 10000L) 500L else 200L
+      denom <- if (n_epochs > 10L) n_epochs else default_epochs
+      keep <- weights >= (max(weights) / denom)
+      head <- head[keep]
+      tail <- tail[keep]
+      weights <- weights[keep]
+    }
+    list(
+      head = head,
+      tail = tail,
+      epochs_per_sample = uwot:::make_epochs_per_sample(weights, n_epochs)
+    )
+  }
+
+  .seurat_runumap_build_graph <- function(X, n.neighbors,
+                                           local.connectivity,
+                                           set.op.mix.ratio, seed.use,
+                                           threads) {
+    X_norm <- .seurat_runumap_normalize_rows(X)
+    knn <- az_runumap_knn_cpp(
+      X = X_norm,
+      k = as.integer(n.neighbors) - 1L,
+      n_trees = 32L,
+      n_iters = 20L,
+      leaf_size = 30L,
+      seed = as.numeric(seed.use %||% 42L),
+      n_threads = as.integer(threads)
+    )
+    idx <- cbind(seq_len(nrow(X_norm)), knn$idx)
+    dist <- cbind(0, sqrt(pmax(knn$dist, 0)))
+    sorted <- .seurat_runumap_sort_knn(idx, dist)
+    affinity <- uwot:::smooth_knn_matrix(
+      nn = list(idx = sorted$idx, dist = sorted$dist),
+      local_connectivity = local.connectivity,
+      bandwidth = 1,
+      ret_sigma = FALSE,
+      n_threads = as.integer(threads),
+      grain_size = 1,
+      verbose = FALSE
+    )$matrix
+    uwot:::fuzzy_set_union(affinity, set_op_mix_ratio = set.op.mix.ratio)
+  }
+
+  fast_RunUMAP_Seurat <- function(object, dims = NULL, reduction = "pca",
+                                  features = NULL, graph = NULL,
+                                  assay = SeuratObject::DefaultAssay(object = object),
+                                  nn.name = NULL, slot = "data",
+                                  umap.method = "uwot",
+                                  reduction.model = NULL,
+                                  return.model = FALSE, n.neighbors = 30L,
+                                  n.components = 2L, metric = "cosine",
+                                  n.epochs = NULL, learning.rate = 1,
+                                  min.dist = 0.3, spread = 1,
+                                  set.op.mix.ratio = 1,
+                                  local.connectivity = 1L,
+                                  repulsion.strength = 1,
+                                  negative.sample.rate = 5L,
+                                  a = NULL, b = NULL,
+                                  uwot.sgd = FALSE,
+                                  uwot.approx_pow = FALSE,
+                                  seed.use = 42L,
+                                  metric.kwds = NULL,
+                                  angular.rp.forest = FALSE,
+                                  densmap = FALSE,
+                                  dens.lambda = 2, dens.frac = 0.3,
+                                  dens.var.shift = 0.1,
+                                  verbose = TRUE,
+                                  reduction.name = "umap",
+                                  reduction.key = NULL, zyme = TRUE,
+                                  turbo = NULL, ...) {
+    zyme <- .seurat_zyme_flag(zyme, turbo)
+    extra <- list(...)
+    fast_ok <- isTRUE(zyme) &&
+      requireNamespace("uwot", quietly = TRUE) &&
+      length(extra) == 0L &&
+      !is.null(dims) &&
+      is.null(features) && is.null(graph) && is.null(nn.name) &&
+      .seurat_runumap_equal_scalar(reduction, "pca") &&
+      .seurat_runumap_equal_scalar(umap.method, "uwot") &&
+      is.null(reduction.model) &&
+      identical(return.model, FALSE) &&
+      as.integer(n.neighbors) >= 2L &&
+      as.integer(n.components) == 2L &&
+      .seurat_runumap_equal_scalar(metric, "cosine") &&
+      isTRUE(all.equal(as.numeric(learning.rate), 1)) &&
+      isTRUE(all.equal(as.numeric(repulsion.strength), 1)) &&
+      as.integer(negative.sample.rate) == 5L &&
+      identical(uwot.sgd, FALSE) &&
+      identical(uwot.approx_pow, FALSE) &&
+      is.null(metric.kwds) &&
+      identical(angular.rp.forest, FALSE) &&
+      identical(densmap, FALSE)
+
+    fallback <- function() {
+      with_disabled(.seurat_orig_RunUMAP_Seurat(
+        object = object, dims = dims, reduction = reduction,
+        features = features, graph = graph, assay = assay, nn.name = nn.name,
+        slot = slot, umap.method = umap.method,
+        reduction.model = reduction.model, return.model = return.model,
+        n.neighbors = n.neighbors, n.components = n.components,
+        metric = metric, n.epochs = n.epochs, learning.rate = learning.rate,
+        min.dist = min.dist, spread = spread,
+        set.op.mix.ratio = set.op.mix.ratio,
+        local.connectivity = local.connectivity,
+        repulsion.strength = repulsion.strength,
+        negative.sample.rate = negative.sample.rate,
+        a = a, b = b, uwot.sgd = uwot.sgd,
+        uwot.approx_pow = uwot.approx_pow, seed.use = seed.use,
+        metric.kwds = metric.kwds,
+        angular.rp.forest = angular.rp.forest,
+        densmap = densmap, dens.lambda = dens.lambda,
+        dens.frac = dens.frac, dens.var.shift = dens.var.shift,
+        verbose = verbose, reduction.name = reduction.name,
+        reduction.key = reduction.key, ...))
+    }
+
+    if (!fast_ok) return(fallback())
+
+    out <- tryCatch({
+      emb_src <- SeuratObject::Embeddings(object[[reduction]])
+      X <- as.matrix(emb_src[, dims, drop = FALSE])
+      if (ncol(X) < as.integer(n.components)) {
+        stop("insufficient dimensions for UMAP")
+      }
+      assay <- SeuratObject::DefaultAssay(object = object[[reduction]])
+      threads <- .seurat_runumap_threads()
+      n_epochs_eff <- .seurat_runumap_default_epochs(nrow(X), n.epochs)
+
+      graph_fast <- .seurat_runumap_build_graph(
+        X = X,
+        n.neighbors = n.neighbors,
+        local.connectivity = local.connectivity,
+        set.op.mix.ratio = set.op.mix.ratio,
+        seed.use = seed.use,
+        threads = threads
+      )
+
+      if (!is.null(seed.use)) set.seed(seed.use)
+      init <- tryCatch(
+        uwot:::spectral_init(graph_fast, ndim = as.integer(n.components),
+                             verbose = FALSE),
+        error = function(e) {
+          if (!is.null(seed.use)) set.seed(seed.use)
+          uwot:::rand_init(nrow(X), as.integer(n.components), verbose = FALSE)
+        }
+      )
+
+      if (is.null(a) || is.null(b)) {
+        ab <- uwot:::find_ab_params(spread = spread, min_dist = min.dist)
+        a_eff <- as.numeric(a %||% ab[["a"]])
+        b_eff <- as.numeric(b %||% ab[["b"]])
+      } else {
+        a_eff <- as.numeric(a)
+        b_eff <- as.numeric(b)
+      }
+
+      li <- .seurat_runumap_graph_inputs(graph_fast, n_epochs_eff)
+      emb <- az_runumap_layout_cpp(
+        init = init,
+        head = li$head,
+        tail = li$tail,
+        epochs_per_sample = li$epochs_per_sample,
+        n_epochs = as.integer(n_epochs_eff),
+        a = a_eff,
+        b = b_eff,
+        gamma = as.numeric(repulsion.strength),
+        initial_alpha = as.numeric(learning.rate),
+        negative_sample_rate = as.numeric(negative.sample.rate),
+        seed = as.numeric(seed.use %||% 42L),
+        n_threads = as.integer(threads)
+      )
+
+      rownames(emb) <- rownames(X)
+      colnames(emb) <- paste0(reduction.key %||%
+                                SeuratObject::Key(object = reduction.name,
+                                                  quiet = TRUE),
+                              seq_len(ncol(emb)))
+      object[[reduction.name]] <- Seurat::CreateDimReducObject(
+        embeddings = emb,
+        key = reduction.key %||% SeuratObject::Key(object = reduction.name,
+                                                   quiet = TRUE),
+        assay = assay,
+        global = TRUE
+      )
+      SeuratObject::LogSeuratCommand(object = object)
+    }, error = function(e) NULL)
+
+    if (!is.null(out)) return(out)
+    fallback()
+  }
 
   # ── Register ─────────────────────────────────────────────────────────────
 
   register_patch(
     name = "seurat",
     upstream = "Seurat",
-    targets = list(
+    targets = c(list(
       NormalizeData.Seurat            = fast_NormalizeData_Seurat,
       FindVariableFeatures.Seurat     = fast_FindVariableFeatures_Seurat,
       FindVariableFeatures.StdAssay   = fast_FindVariableFeatures_StdAssay,
@@ -2375,7 +2614,11 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
       CCAIntegration                  = fast_CCAIntegration,
       SCTransform.Seurat              = fast_SCTransform_Seurat,
       SCTransform.default             = fast_SCTransform_default
-    ),
+    ), if (requireNamespace("uwot", quietly = TRUE)) {
+      list(RunUMAP.Seurat = fast_RunUMAP_Seurat)
+    } else {
+      list()
+    }),
     smoke = list(
       # Representative task: Seurat::FindAllMarkers on a clustered object.
       # Canonical signature from optimized_task/test_seurat_scanpy/find_all_markers/v2/

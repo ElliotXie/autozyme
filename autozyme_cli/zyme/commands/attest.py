@@ -110,11 +110,14 @@ def _infer_patch_name(task_dir: Path) -> str | None:
         target = (cfg.get("target_function") or "").strip()
         if not target or "<" in target:
             return None
+        # Registered patch dirs are lowercase (scanpy, seurat, rctd, mast...),
+        # but R target_functions are CamelCase (Seurat::, RCTD::, MAST::), so
+        # lowercase the upstream-package segment to match the registry.
         if "::" in target:
-            return target.split("::", 1)[0].strip() or None
+            return (target.split("::", 1)[0].strip() or "").lower() or None
         if "." in target:
-            return target.split(".", 1)[0].strip() or None
-        return target or None
+            return (target.split(".", 1)[0].strip() or "").lower() or None
+        return target.lower() or None
     except Exception:
         return None
 
@@ -767,34 +770,47 @@ def _publish_after_attest(
         if publish_mode not in ("merge", "append", "overwrite"):
             publish_mode = "merge"
         for plat, plat_text in _partition_by_platform(new_text).items():
-            n_plat = max(0, len(plat_text.splitlines()) - 1)
-            plat_dst = dst.with_name(f"{dst.stem}.{plat}{dst.suffix}")
-            existing_disk_text = (
-                plat_dst.read_text(encoding="utf-8") if plat_dst.is_file() else ""
-            )
-            existing_text, pruned_rows = prune_published_tsv_text(
-                existing_disk_text, max_threads=publish_filter.max_threads,
-            )
-            final_text, action_summary, total_rows = _combine_for_write(
-                existing_text, plat_text, n_plat, publish_mode,
-            )
-            if plat_dst.is_file() and final_text == existing_disk_text:
+            # Each platform shard is written independently: a stale/legacy
+            # shard on one platform (e.g. a pre-`package_version` mac/win shard
+            # whose header no longer row-merges) must not abort the platforms
+            # we *can* write. The current run's own platform (e.g. linux) still
+            # lands even when historical mac/win rows in package_verify.tsv hit
+            # a header mismatch on their shards.
+            try:
+                n_plat = max(0, len(plat_text.splitlines()) - 1)
+                plat_dst = dst.with_name(f"{dst.stem}.{plat}{dst.suffix}")
+                existing_disk_text = (
+                    plat_dst.read_text(encoding="utf-8") if plat_dst.is_file() else ""
+                )
+                existing_text, pruned_rows = prune_published_tsv_text(
+                    existing_disk_text, max_threads=publish_filter.max_threads,
+                )
+                final_text, action_summary, total_rows = _combine_for_write(
+                    existing_text, plat_text, n_plat, publish_mode,
+                )
+                if plat_dst.is_file() and final_text == existing_disk_text:
+                    print(
+                        f"[publish-speedups] already up to date: {plat_dst}",
+                        file=sys.stderr,
+                    )
+                    continue
+                plat_dst.parent.mkdir(parents=True, exist_ok=True)
+                plat_dst.write_text(final_text, encoding="utf-8")
+                prune_summary = (
+                    f"pruned stale rows={pruned_rows} | " if pruned_rows else ""
+                )
                 print(
-                    f"[publish-speedups] already up to date: {plat_dst}",
+                    f"[publish-speedups] {task_id} [{plat}]: {summary} | "
+                    f"{prune_summary}{action_summary} -> {plat_dst} "
+                    f"({total_rows} rows)",
+                    file=sys.stderr,
+                )
+            except (OSError, PublishFilterError, ValueError) as e:
+                print(
+                    f"[publish-speedups] {task_id} [{plat}]: skipped ({e})",
                     file=sys.stderr,
                 )
                 continue
-            plat_dst.parent.mkdir(parents=True, exist_ok=True)
-            plat_dst.write_text(final_text, encoding="utf-8")
-            prune_summary = (
-                f"pruned stale rows={pruned_rows} | " if pruned_rows else ""
-            )
-            print(
-                f"[publish-speedups] {task_id} [{plat}]: {summary} | "
-                f"{prune_summary}{action_summary} -> {plat_dst} "
-                f"({total_rows} rows)",
-                file=sys.stderr,
-            )
     except (OSError, PublishFilterError, ValueError) as e:
         print(f"[publish-speedups] skipped; {e}", file=sys.stderr)
         return False
@@ -930,6 +946,7 @@ def cmd_attest(args):
                 task_dir=str(td),
                 continue_on_fail=False,
                 skip_parity=False,
+                lang=getattr(args, "lang", None),
             )
             rc = cmd_package_preflight(pre_args)
             if rc != 0:

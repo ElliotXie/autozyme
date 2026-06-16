@@ -158,6 +158,67 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// fitDisp_zyme
+List fitDisp_zyme(SEXP ySEXP, SEXP xSEXP, SEXP mu_hatSEXP, SEXP log_alphaSEXP, SEXP log_alpha_prior_meanSEXP, SEXP log_alpha_prior_sigmasqSEXP, SEXP min_log_alphaSEXP, SEXP kappa_0SEXP, SEXP tolSEXP, SEXP maxitSEXP, SEXP usePriorSEXP, SEXP weightsSEXP, SEXP useWeightsSEXP, SEXP weightThresholdSEXP, SEXP useCRSEXP);
+RcppExport SEXP _autozyme_fitDisp_zyme(SEXP ySEXPSEXP, SEXP xSEXPSEXP, SEXP mu_hatSEXPSEXP, SEXP log_alphaSEXPSEXP, SEXP log_alpha_prior_meanSEXPSEXP, SEXP log_alpha_prior_sigmasqSEXPSEXP, SEXP min_log_alphaSEXPSEXP, SEXP kappa_0SEXPSEXP, SEXP tolSEXPSEXP, SEXP maxitSEXPSEXP, SEXP usePriorSEXPSEXP, SEXP weightsSEXPSEXP, SEXP useWeightsSEXPSEXP, SEXP weightThresholdSEXPSEXP, SEXP useCRSEXPSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type ySEXP(ySEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type xSEXP(xSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type mu_hatSEXP(mu_hatSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type log_alphaSEXP(log_alphaSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type log_alpha_prior_meanSEXP(log_alpha_prior_meanSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type log_alpha_prior_sigmasqSEXP(log_alpha_prior_sigmasqSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type min_log_alphaSEXP(min_log_alphaSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type kappa_0SEXP(kappa_0SEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type tolSEXP(tolSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type maxitSEXP(maxitSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type usePriorSEXP(usePriorSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type weightsSEXP(weightsSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type useWeightsSEXP(useWeightsSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type weightThresholdSEXP(weightThresholdSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type useCRSEXP(useCRSEXPSEXP);
+    rcpp_result_gen = Rcpp::wrap(fitDisp_zyme(ySEXP, xSEXP, mu_hatSEXP, log_alphaSEXP, log_alpha_prior_meanSEXP, log_alpha_prior_sigmasqSEXP, min_log_alphaSEXP, kappa_0SEXP, tolSEXP, maxitSEXP, usePriorSEXP, weightsSEXP, useWeightsSEXP, weightThresholdSEXP, useCRSEXP));
+    return rcpp_result_gen;
+END_RCPP
+}
+// row_trimmed_means
+NumericVector row_trimmed_means(NumericMatrix m, IntegerVector cols0, double trim);
+RcppExport SEXP _autozyme_row_trimmed_means(SEXP mSEXP, SEXP cols0SEXP, SEXP trimSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type m(mSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type cols0(cols0SEXP);
+    Rcpp::traits::input_parameter< double >::type trim(trimSEXP);
+    rcpp_result_gen = Rcpp::wrap(row_trimmed_means(m, cols0, trim));
+    return rcpp_result_gen;
+END_RCPP
+}
+// fitBeta_zyme
+List fitBeta_zyme(SEXP ySEXP, SEXP xSEXP, SEXP nfSEXP, SEXP alpha_hatSEXP, SEXP contrastSEXP, SEXP beta_matSEXP, SEXP lambdaSEXP, SEXP weightsSEXP, SEXP useWeightsSEXP, SEXP tolSEXP, SEXP maxitSEXP, SEXP useQRSEXP, SEXP minmuSEXP);
+RcppExport SEXP _autozyme_fitBeta_zyme(SEXP ySEXPSEXP, SEXP xSEXPSEXP, SEXP nfSEXPSEXP, SEXP alpha_hatSEXPSEXP, SEXP contrastSEXPSEXP, SEXP beta_matSEXPSEXP, SEXP lambdaSEXPSEXP, SEXP weightsSEXPSEXP, SEXP useWeightsSEXPSEXP, SEXP tolSEXPSEXP, SEXP maxitSEXPSEXP, SEXP useQRSEXPSEXP, SEXP minmuSEXPSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type ySEXP(ySEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type xSEXP(xSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type nfSEXP(nfSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type alpha_hatSEXP(alpha_hatSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type contrastSEXP(contrastSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type beta_matSEXP(beta_matSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type lambdaSEXP(lambdaSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type weightsSEXP(weightsSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type useWeightsSEXP(useWeightsSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type tolSEXP(tolSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type maxitSEXP(maxitSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type useQRSEXP(useQRSEXPSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type minmuSEXP(minmuSEXPSEXP);
+    rcpp_result_gen = Rcpp::wrap(fitBeta_zyme(ySEXP, xSEXP, nfSEXP, alpha_hatSEXP, contrastSEXP, beta_matSEXP, lambdaSEXP, weightsSEXP, useWeightsSEXP, tolSEXP, maxitSEXP, useQRSEXP, minmuSEXP));
+    return rcpp_result_gen;
+END_RCPP
+}
 // calcEsLeBatchCpp
 Rcpp::List calcEsLeBatchCpp(Rcpp::NumericVector const& stats, Rcpp::List const& selectedGenes, std::string scoreType);
 RcppExport SEXP _autozyme_calcEsLeBatchCpp(SEXP statsSEXP, SEXP selectedGenesSEXP, SEXP scoreTypeSEXP) {
@@ -447,6 +508,33 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type n_rows(n_rowsSEXP);
     Rcpp::traits::input_parameter< int >::type n_cols(n_colsSEXP);
     rcpp_result_gen = Rcpp::wrap(zyme_fill_dcast(row_codes, col_codes, counts, n_rows, n_cols));
+    return rcpp_result_gen;
+END_RCPP
+}
+// fast_milor_pdist_one
+S4 fast_milor_pdist_one(NumericMatrix in_x, SEXP row_names);
+RcppExport SEXP _autozyme_fast_milor_pdist_one(SEXP in_xSEXP, SEXP row_namesSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type in_x(in_xSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type row_names(row_namesSEXP);
+    rcpp_result_gen = Rcpp::wrap(fast_milor_pdist_one(in_x, row_names));
+    return rcpp_result_gen;
+END_RCPP
+}
+// fast_milor_pdist_batch
+List fast_milor_pdist_batch(NumericMatrix rd_mat, IntegerMatrix non_zero, int nh_n, SEXP cell_names, int n_threads);
+RcppExport SEXP _autozyme_fast_milor_pdist_batch(SEXP rd_matSEXP, SEXP non_zeroSEXP, SEXP nh_nSEXP, SEXP cell_namesSEXP, SEXP n_threadsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type rd_mat(rd_matSEXP);
+    Rcpp::traits::input_parameter< IntegerMatrix >::type non_zero(non_zeroSEXP);
+    Rcpp::traits::input_parameter< int >::type nh_n(nh_nSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type cell_names(cell_namesSEXP);
+    Rcpp::traits::input_parameter< int >::type n_threads(n_threadsSEXP);
+    rcpp_result_gen = Rcpp::wrap(fast_milor_pdist_batch(rd_mat, non_zero, nh_n, cell_names, n_threads));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -820,6 +908,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// seurat_exact_knn_f32
+Rcpp::IntegerMatrix seurat_exact_knn_f32(Rcpp::NumericMatrix data, int k, int n_threads);
+RcppExport SEXP _autozyme_seurat_exact_knn_f32(SEXP dataSEXP, SEXP kSEXP, SEXP n_threadsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericMatrix >::type data(dataSEXP);
+    Rcpp::traits::input_parameter< int >::type k(kSEXP);
+    Rcpp::traits::input_parameter< int >::type n_threads(n_threadsSEXP);
+    rcpp_result_gen = Rcpp::wrap(seurat_exact_knn_f32(data, k, n_threads));
+    return rcpp_result_gen;
+END_RCPP
+}
 // seurat_log_normalize_dgc
 void seurat_log_normalize_dgc(S4 mat, double scale_factor, int grain_size);
 RcppExport SEXP _autozyme_seurat_log_normalize_dgc(SEXP matSEXP, SEXP scale_factorSEXP, SEXP grain_sizeSEXP) {
@@ -830,6 +931,45 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type grain_size(grain_sizeSEXP);
     seurat_log_normalize_dgc(mat, scale_factor, grain_size);
     return R_NilValue;
+END_RCPP
+}
+// az_runumap_knn_cpp
+Rcpp::List az_runumap_knn_cpp(Rcpp::NumericMatrix X, int k, int n_trees, int n_iters, int leaf_size, double seed, int n_threads);
+RcppExport SEXP _autozyme_az_runumap_knn_cpp(SEXP XSEXP, SEXP kSEXP, SEXP n_treesSEXP, SEXP n_itersSEXP, SEXP leaf_sizeSEXP, SEXP seedSEXP, SEXP n_threadsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericMatrix >::type X(XSEXP);
+    Rcpp::traits::input_parameter< int >::type k(kSEXP);
+    Rcpp::traits::input_parameter< int >::type n_trees(n_treesSEXP);
+    Rcpp::traits::input_parameter< int >::type n_iters(n_itersSEXP);
+    Rcpp::traits::input_parameter< int >::type leaf_size(leaf_sizeSEXP);
+    Rcpp::traits::input_parameter< double >::type seed(seedSEXP);
+    Rcpp::traits::input_parameter< int >::type n_threads(n_threadsSEXP);
+    rcpp_result_gen = Rcpp::wrap(az_runumap_knn_cpp(X, k, n_trees, n_iters, leaf_size, seed, n_threads));
+    return rcpp_result_gen;
+END_RCPP
+}
+// az_runumap_layout_cpp
+Rcpp::NumericMatrix az_runumap_layout_cpp(Rcpp::NumericMatrix init, Rcpp::IntegerVector head, Rcpp::IntegerVector tail, Rcpp::NumericVector epochs_per_sample, int n_epochs, double a, double b, double gamma, double initial_alpha, double negative_sample_rate, double seed, int n_threads);
+RcppExport SEXP _autozyme_az_runumap_layout_cpp(SEXP initSEXP, SEXP headSEXP, SEXP tailSEXP, SEXP epochs_per_sampleSEXP, SEXP n_epochsSEXP, SEXP aSEXP, SEXP bSEXP, SEXP gammaSEXP, SEXP initial_alphaSEXP, SEXP negative_sample_rateSEXP, SEXP seedSEXP, SEXP n_threadsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericMatrix >::type init(initSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type head(headSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type tail(tailSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type epochs_per_sample(epochs_per_sampleSEXP);
+    Rcpp::traits::input_parameter< int >::type n_epochs(n_epochsSEXP);
+    Rcpp::traits::input_parameter< double >::type a(aSEXP);
+    Rcpp::traits::input_parameter< double >::type b(bSEXP);
+    Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
+    Rcpp::traits::input_parameter< double >::type initial_alpha(initial_alphaSEXP);
+    Rcpp::traits::input_parameter< double >::type negative_sample_rate(negative_sample_rateSEXP);
+    Rcpp::traits::input_parameter< double >::type seed(seedSEXP);
+    Rcpp::traits::input_parameter< int >::type n_threads(n_threadsSEXP);
+    rcpp_result_gen = Rcpp::wrap(az_runumap_layout_cpp(init, head, tail, epochs_per_sample, n_epochs, a, b, gamma, initial_alpha, negative_sample_rate, seed, n_threads));
+    return rcpp_result_gen;
 END_RCPP
 }
 // turbo_scale_sparse_full
@@ -1081,6 +1221,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_autozyme_cpp_unified_inner", (DL_FUNC) &_autozyme_cpp_unified_inner, 20},
     {"_autozyme_cpp_updateState", (DL_FUNC) &_autozyme_cpp_updateState, 17},
     {"_autozyme_fast_decontXEM_cpp", (DL_FUNC) &_autozyme_fast_decontXEM_cpp, 11},
+    {"_autozyme_fitDisp_zyme", (DL_FUNC) &_autozyme_fitDisp_zyme, 15},
+    {"_autozyme_row_trimmed_means", (DL_FUNC) &_autozyme_row_trimmed_means, 3},
+    {"_autozyme_fitBeta_zyme", (DL_FUNC) &_autozyme_fitBeta_zyme, 13},
     {"_autozyme_calcEsLeBatchCpp", (DL_FUNC) &_autozyme_calcEsLeBatchCpp, 3},
     {"_autozyme_fastFgseaMultilevelBatchCpp", (DL_FUNC) &_autozyme_fastFgseaMultilevelBatchCpp, 8},
     {"_autozyme_count_sum_by_group_dgc", (DL_FUNC) &_autozyme_count_sum_by_group_dgc, 3},
@@ -1102,6 +1245,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_autozyme_fast_cell_prob_cpp", (DL_FUNC) &_autozyme_fast_cell_prob_cpp, 2},
     {"_autozyme_fast_viterbi_adj_cpp", (DL_FUNC) &_autozyme_fast_viterbi_adj_cpp, 5},
     {"_autozyme_zyme_fill_dcast", (DL_FUNC) &_autozyme_zyme_fill_dcast, 5},
+    {"_autozyme_fast_milor_pdist_one", (DL_FUNC) &_autozyme_fast_milor_pdist_one, 2},
+    {"_autozyme_fast_milor_pdist_batch", (DL_FUNC) &_autozyme_fast_milor_pdist_batch, 5},
     {"_autozyme_az_blas_gemm", (DL_FUNC) &_autozyme_az_blas_gemm, 6},
     {"_autozyme_az_blas_crossprod", (DL_FUNC) &_autozyme_az_blas_crossprod, 3},
     {"_autozyme_az_blas_info", (DL_FUNC) &_autozyme_az_blas_info, 1},
@@ -1126,7 +1271,10 @@ static const R_CallMethodDef CallEntries[] = {
     {"_autozyme_turbo_all_in_one_wilcox", (DL_FUNC) &_autozyme_turbo_all_in_one_wilcox, 7},
     {"_autozyme_parallel_all_in_one_dgc", (DL_FUNC) &_autozyme_parallel_all_in_one_dgc, 3},
     {"_autozyme_turbo_annoy_build_search", (DL_FUNC) &_autozyme_turbo_annoy_build_search, 4},
+    {"_autozyme_seurat_exact_knn_f32", (DL_FUNC) &_autozyme_seurat_exact_knn_f32, 3},
     {"_autozyme_seurat_log_normalize_dgc", (DL_FUNC) &_autozyme_seurat_log_normalize_dgc, 3},
+    {"_autozyme_az_runumap_knn_cpp", (DL_FUNC) &_autozyme_az_runumap_knn_cpp, 7},
+    {"_autozyme_az_runumap_layout_cpp", (DL_FUNC) &_autozyme_az_runumap_layout_cpp, 12},
     {"_autozyme_turbo_scale_sparse_full", (DL_FUNC) &_autozyme_turbo_scale_sparse_full, 3},
     {"_autozyme_turbo_csc_to_csr", (DL_FUNC) &_autozyme_turbo_csc_to_csr, 5},
     {"_autozyme_turbo_stats_correct_sparse", (DL_FUNC) &_autozyme_turbo_stats_correct_sparse, 12},

@@ -4,6 +4,32 @@ from __future__ import annotations
 import pytest
 
 
+def _regress_out_is_patched() -> bool:
+    """True only when the scanpy ``regress_out`` patch is actually active.
+
+    The patch is currently retired from the shipped scanpy surface (see
+    ``src/autozyme/scanpy/CHANGELOG.md``, 2026-05-24: it is commented out in
+    ``scanpy/__init__.py``), so vanilla ``sc.pp.regress_out`` does not accept the
+    ``zyme=`` kwarg these tests exercise. We skip the module while it is disabled
+    and let it light back up automatically if the patch is re-registered.
+    """
+    try:
+        import autozyme
+        import scanpy as sc
+
+        autozyme.activate("scanpy")
+    except Exception:
+        return False
+    return hasattr(sc.pp.regress_out, "__autozyme_fast__")
+
+
+pytestmark = pytest.mark.skipif(
+    not _regress_out_is_patched(),
+    reason="scanpy regress_out patch is currently disabled "
+    "(retired 2026-05-24; see scanpy/CHANGELOG.md). Re-enabling restores these tests.",
+)
+
+
 def _with_numeric_covariates(adata):
     np = pytest.importorskip("numpy")
 

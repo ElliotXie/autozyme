@@ -37,6 +37,24 @@ cell2location = [
     "scvi-tools==1.3.3",
     "pyro-ppl==1.9.1",
 ]
+# The lifelines accelerator's Cox kernel needs numba, which lifelines itself
+# does not pull in: `pip install autozyme[lifelines]` provisions it. Without
+# numba the patch declines to activate (with an actionable message) rather
+# than erroring -- see autozyme/lifelines runtime_deps.
+lifelines = ["numba"]
+# sccoda 0.1.9 binds a TensorFlow/TFP HMC kernel and is fragile to its own
+# transitive stack: arviz 1.x dropped `arviz.data` (which sccoda 0.1.9 imports),
+# and the patch runs TF's legacy-Keras path (TF_USE_LEGACY_KERAS=1), so tf-keras
+# must be present. This extra provisions the import-validated freeze.
+# Platform caveat: the HMC sampler is validated on Linux. On macOS arm64 the
+# TensorFlow/XLA HMC step can hang; prefer Linux or a conda-forge TensorFlow
+# build there. See src/autozyme/sccoda/SCOPE.md for the full scope.
+sccoda = [
+    "sccoda==0.1.9",
+    "arviz==0.23.4",
+    "tf-keras",
+    "tensorflow-probability",
+]
 
 [project.urls]
 Homepage = "https://autozyme.com"

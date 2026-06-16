@@ -16,8 +16,7 @@
 # closest thing autozyme has to a fully ship-ready demo.
 
 if (requireNamespace("MAST",                 quietly = TRUE) &&
-    requireNamespace("SummarizedExperiment", quietly = TRUE) &&
-    requireNamespace("yaml",                 quietly = TRUE)) {
+    requireNamespace("SummarizedExperiment", quietly = TRUE)) {
 
   .mast_orig_bgf    <- utils::getFromNamespace(".bayesglm.fit", "MAST")
   .mast_orig_lrTest <- utils::getFromNamespace("lrTest",        "MAST")

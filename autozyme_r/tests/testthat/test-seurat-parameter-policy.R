@@ -17,12 +17,26 @@ test_that("Seurat integration fast paths preserve upstream parameter policy", {
                      cca_body, perl = TRUE))
 })
 
-test_that("RunUMAP is retired from the Seurat package patch", {
+test_that("RunUMAP is part of the Seurat package patch", {
   skip_if_not_installed("Seurat")
+  skip_if_not_installed("SeuratObject")
+  skip_if_not_installed("Matrix")
+  skip_if_not_installed("uwot")
 
   expect_true(autozyme:::.ensure_registered("seurat"))
   targets <- names(autozyme:::.zyme_registry[["seurat"]]$targets)
 
-  expect_false("RunUMAP.Seurat" %in% targets)
+  expect_true("RunUMAP.Seurat" %in% targets)
   expect_false("RunUMAP.default" %in% targets)
+  expect_false("seurat_runumap" %in% autozyme::list_patches())
+
+  on.exit(try(autozyme::activate("seurat"), silent = TRUE), add = TRUE)
+  autozyme::deactivate("seurat")
+  expect_equal(unname(autozyme::status()[["seurat"]]), "inactive")
+
+  expect_true(autozyme::activate("seurat"))
+  expect_equal(unname(autozyme::status()[["seurat"]]), "active")
+
+  autozyme::deactivate("seurat")
+  expect_equal(unname(autozyme::status()[["seurat"]]), "inactive")
 })

@@ -106,59 +106,89 @@ set_threads <- function(n) {
 #'
 #' Resolves a worker count using this priority order:
 #' \enumerate{
-#'   \item \code{AUTOZYME_THREADS} environment variable (explicit user
-#'     override; wins over everything, including \code{cap}).
-#'   \item \code{getOption("autozyme.threads")} (also wins over \code{cap}).
-#'   \item Hardware default: \code{detectCores(logical=FALSE) - 1}, bounded
-#'     above by \code{cap} (if given) and a hard ceiling of 16 to prevent
-#'     runaway oversubscription on big machines.
+#'   \item The first set of these environment variables, in order:
+#'     \code{ZYME_THREADS} > \code{AUTOZYME_THREADS} > \code{OMP_NUM_THREADS}
+#'     (any one the attest harness propagates). An explicit env override wins
+#'     over everything, including \code{cap} and \code{default}.
+#'   \item \code{getOption("autozyme.threads")} (also wins over \code{cap}
+#'     and \code{default}).
+#'   \item \code{default} threads, bounded above by the machine's core count,
+#'     by \code{cap} (if given), and by a hard ceiling of 16.
 #' }
+#'
+#' \code{default} is \strong{4} — the count the finalized speedup sweeps
+#' showed is the best single conservative default: it captures the large 1->4
+#' jump (~1.9x median wall-clock) while staying clear of the oversubscription
+#' cliff that makes >4 threads \emph{slower} on small inputs for many patches.
+#' Pass \code{default = NULL} to opt a patch into hardware scaling
+#' (\code{detectCores(logical=FALSE) - 1}, still capped at 16) — reserve that
+#' for the few patches whose finalized data keeps improving past 4 threads.
 #'
 #' Designed for use inside lifted patches as a drop-in replacement for
 #' hardcoded thread counts (\code{mc.cores = 12L} -> \code{mc.cores =
-#' auto_threads(cap = 12L)}). \code{cap} should be the patch's max sensible
-#' worker count — typically what the lift-time \code{pipeline/run.R} used.
-#' Tier-aware patches pass \code{cap} from a per-tier dict.
+#' auto_threads(cap = 12L)}). \code{cap} is the patch's max sensible worker
+#' count — a ceiling layered on top of \code{default}.
 #'
-#' @param cap Optional integer upper bound. Caps the hardware default; does
-#'   NOT cap the env-var or option override (those represent explicit user
-#'   intent and win even when above \code{cap}, e.g. for CI thread sweeps).
+#' @param cap Optional integer upper bound on the resolved count. Does NOT cap
+#'   the env-var or option override (those represent explicit user intent and
+#'   win even when above \code{cap}, e.g. for CI thread sweeps).
+#' @param default Base thread count when no env/option override is present.
+#'   Defaults to 4. \code{NULL} means "scale to hardware"
+#'   (\code{detectCores(logical=FALSE) - 1}).
 #' @return Positive integer thread count, always >= 1.
 #' @examples
-#' auto_threads()                        # hardware default
-#' auto_threads(cap = 8L)                # cap at 8
-#' Sys.setenv(AUTOZYME_THREADS = "4")
-#' auto_threads(cap = 8L)                # 4 (env wins)
+#' auto_threads()                        # 4 (bounded by core count)
+#' auto_threads(cap = 2L)                # 2
+#' auto_threads(default = NULL)          # detectCores() - 1, max 16
+#' Sys.setenv(AUTOZYME_THREADS = "8")
+#' auto_threads()                        # 8 (env wins)
 #' Sys.unsetenv("AUTOZYME_THREADS")
 #' @export
-auto_threads <- function(cap = NULL) {
-  # 1. AUTOZYME_THREADS env var — wins over cap
-  env <- Sys.getenv("AUTOZYME_THREADS", unset = "")
-  if (nzchar(env)) {
-    n <- suppressWarnings(as.integer(env))
-    if (!is.na(n) && n >= 1L) return(n)
+auto_threads <- function(cap = NULL, default = 4L) {
+  # 1. Thread budget from env — wins over cap/default. Honor any of the env
+  # vars the attest harness propagates (ZYME_THREADS primary; AUTOZYME_THREADS
+  # / OMP_NUM_THREADS are mirrors, matching the Python side). Reading all
+  # three keeps benchmark thread-pinning robust regardless of which knob the
+  # harness sets, so the conservative default below never perturbs a measured
+  # sweep.
+  for (var in c("ZYME_THREADS", "AUTOZYME_THREADS", "OMP_NUM_THREADS")) {
+    env <- Sys.getenv(var, unset = "")
+    if (nzchar(env)) {
+      n <- suppressWarnings(as.integer(env))
+      if (!is.na(n) && n >= 1L) return(n)
+    }
   }
 
-  # 2. autozyme.threads option — also wins over cap
+  # 2. autozyme.threads option — also wins over cap/default
   opt <- getOption("autozyme.threads", default = NULL)
   if (!is.null(opt)) {
     n <- suppressWarnings(as.integer(opt))
     if (!is.na(n) && n >= 1L) return(n)
   }
 
-  # 3. Hardware default, bounded by cap and 16-thread ceiling
+  # 3. Base target, bounded by hardware, cap, and the 16-thread ceiling.
   cores <- tryCatch(parallel::detectCores(logical = FALSE),
                     error = function(e) NA_integer_)
   if (is.na(cores) || cores < 1L) cores <- 1L
-  default <- max(1L, as.integer(cores) - 1L)
+
+  if (is.null(default)) {
+    # "Scale to hardware" — for patches whose finalized sweeps keep speeding
+    # up past 4 threads. Leave one core for the OS.
+    base <- max(1L, as.integer(cores) - 1L)
+  } else {
+    base <- suppressWarnings(as.integer(default))
+    if (is.na(base) || base < 1L) base <- 4L  # soft fallback to the floor
+    # Never hand out more workers than the machine has cores.
+    base <- min(base, as.integer(cores))
+  }
 
   if (!is.null(cap)) {
     cap_int <- suppressWarnings(as.integer(cap))
     if (!is.na(cap_int) && cap_int >= 1L) {
-      default <- min(default, cap_int)
+      base <- min(base, cap_int)
     }
   }
 
-  default <- min(default, 16L)
-  max(1L, default)
+  base <- min(base, 16L)
+  max(1L, base)
 }

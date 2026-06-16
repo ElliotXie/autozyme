@@ -192,6 +192,19 @@ def cmd_init(args):
         shutil.copy2(src, dest)
         customized.append(dest)
 
+    # Situational prompts (transfer-init, thread-fairness audit) live in a
+    # `situational/` subdir so they don't clutter the task's top-level
+    # prompts/ — they fire only for specific workflows, not the main 0-5 loop.
+    # Copy them tucked away under prompts/situational/.
+    sit_src = src_dir / "situational"
+    if sit_src.is_dir():
+        sit_dest = prompts_dir / "situational"
+        sit_dest.mkdir(exist_ok=True)
+        for src in sorted(sit_src.glob("*.md")):
+            dest = sit_dest / src.name
+            shutil.copy2(src, dest)
+            customized.append(dest)
+
     # Initial commit captures the full scaffold (template files + prompts).
     # Only commit when we created the repo; if user dropped the task into an
     # existing repo, leave their working tree alone for them to commit.
@@ -205,7 +218,7 @@ def cmd_init(args):
     info(f"prompt set: {field}")
     info(f"prompts written to {prompts_dir}/:")
     for p in customized:
-        info(f"  - {p.name}")
+        info(f"  - {p.relative_to(prompts_dir)}")
 
     # Auto-register an init-stage bench template. Two purposes at once:
     #   (a) Rollback anchor — the pristine bare scaffold the init prompt has

@@ -178,7 +178,7 @@ def test_registered_patch_with_missing_upstream_returns_false():
 
         installed, err = _is_upstream_installed(patch_name)
         assert installed is False
-        assert "upstream not installed" in (err or "")
+        assert "not installed" in (err or "")
 
         # Don't crash — return False cleanly.
         result = autozyme.activate(patch_name)

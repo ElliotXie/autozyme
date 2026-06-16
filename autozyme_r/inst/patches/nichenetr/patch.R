@@ -91,8 +91,11 @@ if (requireNamespace("nichenetr", quietly = TRUE) &&
 
     # auto_threads() honors AUTOZYME_THREADS env / set_threads() (capped at 14);
     # the n_ligands and physical-core mins remain as oversubscription guards.
+    # default=NULL: nichenetr's finalized sweeps keep speeding up well past 4
+    # threads (median ~1.81x faster than t4), so opt out of the conservative
+    # 4-thread floor and scale to hardware (still capped at 14 here).
     n_workers <- min(
-      autozyme::auto_threads(cap = 14L),
+      autozyme::auto_threads(cap = 14L, default = NULL),
       n_ligands,
       parallel::detectCores(logical = FALSE)
     )

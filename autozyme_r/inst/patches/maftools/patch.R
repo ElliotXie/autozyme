@@ -34,8 +34,7 @@
 # the user level (data.table::setDTthreads); the patch does not override.
 
 if (requireNamespace("maftools",   quietly = TRUE) &&
-    requireNamespace("data.table", quietly = TRUE) &&
-    requireNamespace("yaml",       quietly = TRUE)) {
+    requireNamespace("data.table", quietly = TRUE)) {
 
   # data.table's `[.data.table` and `:=` gate dispatch through `cedta()`,
   # which checks `topenv(parent.frame())` against data.table's whitelist.

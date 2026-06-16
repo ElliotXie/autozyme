@@ -121,7 +121,9 @@ def test_activate_installs_dispatcher():
         (sc.pp, "log1p",            "fast_log1p"),
         (sc.pp, "scale",            "fast_scale"),
         (sc.pp, "highly_variable_genes", "_patched_hvg"),
+        (sc.pp, "neighbors",        "fast_neighbors"),
         (sc.tl, "pca",              "fast_pca"),
+        (sc.tl, "umap",             "fast_umap"),
         (sc.tl, "leiden",           "fast_leiden"),
         (sc.tl, "rank_genes_groups", "_fast_rank_genes_groups"),
     ]:

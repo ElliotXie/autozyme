@@ -670,7 +670,7 @@ def build_parser():
                         help="Outcome-B fairness retrofit shortcut: run reference exactly ONCE "
                              "per tier (at thread=1) and replicate the speed_sec/peak_mb to "
                              "every requested thread. Use when upstream is known-serial (no "
-                             "parallelism knob — outcome B in `M_thread_baseline_fairness.md`); "
+                             "parallelism knob — outcome B in `situational/M_thread_baseline_fairness.md`); "
                              "saves wall-time vs re-running the same serial reference at every "
                              "thread, which would otherwise just measure cold-cache noise. "
                              "Replicated rows are description-tagged so downstream readers can "
@@ -2192,8 +2192,9 @@ def build_parser():
     )
     ppkg_chk.add_argument("--patch", default=None,
                           help="Patch name (default: infer from task.yaml::target_function).")
-    ppkg_chk.add_argument("--tier", default="tiny",
-                          help="Tier to run smoke on (default: tiny).")
+    ppkg_chk.add_argument("--tier", default=None,
+                          help="Tier to run smoke on (default: smallest "
+                               "declared tier, e.g. small).")
     ppkg_chk.add_argument("--lang", choices=["py", "R"], default=None,
                           help="Override language detection.")
     ppkg_chk.set_defaults(func=cmd_package_check_intercept)
@@ -2219,8 +2220,9 @@ def build_parser():
     )
     ppkg_par.add_argument("--patch", default=None,
                           help="Patch name (default: infer from task.yaml).")
-    ppkg_par.add_argument("--tier", default="tiny",
-                          help="Tier to run smoke on (default: tiny).")
+    ppkg_par.add_argument("--tier", default=None,
+                          help="Tier to run smoke on (default: smallest "
+                               "declared tier, e.g. small).")
     ppkg_par.add_argument("--lang", choices=["py", "R"], default=None,
                           help="Override language detection.")
     ppkg_par.set_defaults(func=cmd_package_smoke_parity)

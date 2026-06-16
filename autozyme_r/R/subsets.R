@@ -35,6 +35,7 @@
 #
 # Keep in sync with each patch's register_patch(upstream = ...). New patches
 # packaged via 4_package.md must add their entry here.
+# AUTOZYME-GENERATED-UPSTREAMS-BEGIN
 .zyme_upstreams <- list(
   bayesspace      = "BayesSpace",
   cellchat        = "CellChat",
@@ -44,7 +45,7 @@
   infercnv        = "infercnv",
   maftools        = "maftools",
   mast            = "MAST",
-  mgcv            = "mgcv",
+  milor           = "miloR",
   nichenetr       = "nichenetr",
   rctd            = "spacexr",
   scriabin        = "scriabin",
@@ -54,3 +55,4 @@
   vegan           = "vegan",
   wgcna           = "WGCNA"
 )
+# AUTOZYME-GENERATED-UPSTREAMS-END

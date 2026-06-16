@@ -28,6 +28,7 @@ import tempfile
 from pathlib import Path
 
 from zyme.commands.attest import _infer_patch_name
+from zyme.parsers.task_yaml import resolve_smoke_tier
 from zyme.runner import _resolve_python
 from zyme.utils import detect_lang, die, task_dir_from_args
 
@@ -91,7 +92,7 @@ def cmd_package_check_intercept(args) -> int:
     patch = getattr(args, "patch", None) or _infer_patch_name(task_dir)
     if not patch:
         die("could not infer patch name; pass --patch <name>")
-    tier = getattr(args, "tier", None) or "tiny"
+    tier = getattr(args, "tier", None) or resolve_smoke_tier(task_dir / "task.yaml")
     lang = getattr(args, "lang", None) or detect_lang(task_dir)
 
     with tempfile.TemporaryDirectory(prefix="zyme_intercept_") as tmp:

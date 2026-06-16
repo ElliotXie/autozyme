@@ -8,8 +8,9 @@ each patch's ``register_patch()`` call; this command does it mechanically.
     with ``ast``, extract ``register_patch(name=..., targets=[...], ...)``
     arguments. The first element of each target tuple is the upstream
     module path; we take its top-level package as the upstream identifier.
-    ``tested_upstream_versions`` keys are merged in (covers patches that
-    pull a co-dependency like ``pyro`` without listing it as a target).
+    ``tested_upstream_versions`` keys and ``runtime_deps`` entries are merged
+    in (cover co-dependencies a patch needs without targeting them -- e.g.
+    ``pyro`` via a tested version, or ``numba`` via ``runtime_deps``).
 
   - R side: walk ``autozyme_r/inst/patches/*/patch.R``, regex-extract
     ``register_patch(name = "...", upstream = "...")``. R's call form
@@ -90,6 +91,13 @@ def _scan_python(framework_root: Path) -> dict[str, list[str]]:
                     for k in kw.value.keys:
                         if isinstance(k, ast.Constant) and isinstance(k.value, str):
                             upstreams.add(_top_level_pkg(k.value))
+                elif kw.arg == "runtime_deps" and isinstance(kw.value, (ast.List, ast.Tuple)):
+                    # Co-dependencies the patch imports but doesn't target
+                    # (e.g. lifelines -> numba): probed so a missing one skips
+                    # gracefully instead of ImportError on activation.
+                    for elt in kw.value.elts:
+                        if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                            upstreams.add(_top_level_pkg(elt.value))
             if name and upstreams:
                 out.setdefault(name, set()).update(upstreams)
     return {k: sorted(v) for k, v in sorted(out.items())}

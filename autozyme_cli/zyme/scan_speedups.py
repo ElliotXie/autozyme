@@ -315,6 +315,8 @@ def _normalize_platform(value: str) -> str:
         return "win"
     if s.startswith("macos") or s.startswith("darwin") or s == "mac":
         return "mac"
+    if s.startswith("linux") or s == "linux":
+        return "linux"
     return s
 
 

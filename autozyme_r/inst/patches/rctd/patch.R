@@ -29,8 +29,7 @@
 if (requireNamespace("spacexr",   quietly = TRUE) &&
     requireNamespace("Matrix",    quietly = TRUE) &&
     requireNamespace("quadprog",  quietly = TRUE) &&
-    requireNamespace("parallel",  quietly = TRUE) &&
-    requireNamespace("yaml",      quietly = TRUE)) {
+    requireNamespace("parallel",  quietly = TRUE)) {
 
   # Snap spacexr's namespace once. Fast functions reference patched siblings
   # (process_bead_doublet, decompose_sparse, etc.) and unpatched internals

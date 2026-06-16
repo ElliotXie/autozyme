@@ -1,4 +1,5 @@
 RCPPPARALLEL_LIBDIR = $(shell "${R_HOME}/bin/Rscript" -e "cat(system.file('lib', package='RcppParallel'))")
+PKG_CPPFLAGS = -I. -DSCBLAS_BUILDING
 # Accelerate framework is intentionally NOT linked at build time. wgcna.cpp
 # resolves cblas_dgemm via dlopen on first call instead. Link-time
 # `-framework Accelerate` poisons EVERY BLAS symbol in autozyme.so to route

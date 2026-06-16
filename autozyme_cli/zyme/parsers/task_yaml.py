@@ -178,6 +178,34 @@ def parse_datasets(task_yaml: Path):
     return out
 
 
+def resolve_smoke_tier(task_yaml: Path) -> str:
+    """Resolve which tier a smoke / parity pre-check should run on.
+
+    Smoke checks want the task's *smallest* tier (a fast few-second run). The
+    layout used to call that tier ``tiny``, but the 2026-05 standardized
+    6-tier layout renamed it to ``small`` (small/medium/large/ood_*) and most
+    tasks no longer declare a ``tiny`` tier at all. Hard-coding ``"tiny"``
+    therefore makes smoke crash with "no dataset for tier 'tiny'".
+
+    Resolution (robust to either layout, and to future renames):
+      1. an explicit ``tiny`` tier if the task declares one (legacy tasks);
+      2. else ``small`` if declared (the standardized smallest tier);
+      3. else the first declared tier (datasets are listed smallest-first);
+      4. else ``"tiny"`` as a last-resort default when no datasets exist.
+    """
+    try:
+        entries = parse_datasets(task_yaml)
+    except (OSError, ValueError):
+        return "tiny"
+    tiers = [e.get("tier") for e in entries if e.get("tier")]
+    if not tiers:
+        return "tiny"
+    for preferred in ("tiny", "small"):
+        if preferred in tiers:
+            return preferred
+    return tiers[0]
+
+
 def parse_scaling_tax_thresholds(task_yaml: Path) -> dict:
     """Parse `scaling_tax_thresholds:` block from task.yaml. Returns dict with
     `ood_large_soft`, `ood_xlarge_soft`, `hard_fail`, `super_linear_max`

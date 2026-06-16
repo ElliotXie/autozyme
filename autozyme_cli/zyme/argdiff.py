@@ -427,8 +427,8 @@ def diff_side_channel_parallelism(task_dir: Path) -> list[dict]:
 
     Asymmetry = pipeline gets parallelism that the single-threaded reference
     doesn't engage, so speedup mixes "algorithmic gain" with "raw parallelism
-    upstream's default doesn't have." Warning, not gate (see M_thread_baseline_
-    fairness.md's outcome-B carve-out for the legitimate case).
+    upstream's default doesn't have." Warning, not gate (see situational/
+    M_thread_baseline_fairness.md's outcome-B carve-out for the legitimate case).
     """
     ref_path = task_dir / "reference.py"
     pipe_path = task_dir / "pipeline" / "run.py"
@@ -457,7 +457,7 @@ def format_side_channel_divergences(divergences: list[dict]) -> str:
         "signature, but they DO change how much CPU the timed region uses. If the",
         "speedup partly comes from this added parallelism, baseline is unfair.",
         "",
-        "Triage (see M_thread_baseline_fairness.md):",
+        "Triage (see situational/M_thread_baseline_fairness.md):",
         "  - Outcome A — upstream exposes an equivalent knob: mirror the setter in",
         "    reference.py and `zyme baseline reference --tier <t> --thread <N> --force`.",
         "  - Outcome B — upstream lacks an equivalent: leave reference serial; document",

@@ -74,6 +74,16 @@ TASK_ROOTS = (
 
 INIT_INPUTS_HEADING = "## Your inputs for this run"
 
+# Situational prompts (transfer-init, thread-fairness audit) live in a
+# `situational/` subdir, out of the task's top-level prompts/.
+SITUATIONAL_SUBDIR = "situational"
+
+# Prompts removed from the set entirely. A task's stale copy of any of these is
+# deleted on sync, whether it sits at the top level or under `situational/`.
+# (Distinct from `situational/` relocation, which moves the file rather than
+# dropping it.)
+REMOVED_PROMPTS = {"R_report.md", "6.3_cross_platform_port.md"}
+
 
 def _read_text_if_exists(path: Path) -> str:
     if not path.exists():
@@ -211,27 +221,62 @@ def copy_prompt(fw_file: Path, task_file: Path, dry_run: bool) -> bool:
 def sync_task(task_dir: Path, flavor: str, dry_run: bool) -> dict:
     """Sync one task. Returns a per-task report dict.
 
-    Updates files present in both framework and task when they differ; adds
-    files present in framework but missing from the task (so a new framework
-    prompt like `2.5_iterate_memory.md` reaches existing tasks). Files
-    present only in the task are reported as `skipped_no_framework`.
+    Top-level: updates files present in both framework and task when they
+    differ; adds files present in framework but missing from the task (so a new
+    framework prompt like `2.5_iterate_memory.md` reaches existing tasks).
+
+    Situational subdir: mirrors `<field>/situational/*.md` into the task's
+    `prompts/situational/`. A task's stale **top-level** copy of a now-
+    situational prompt (e.g. an old flat `6.1_transfer_init.md`) is relocated:
+    the canonical content is written under `situational/` and the top-level copy
+    is deleted. A top-level copy of a fully-removed prompt (`REMOVED_PROMPTS`) is
+    deleted outright.
+
+    Other files present only in the task are reported as `skipped_no_framework`.
     """
     fw_dir = FRAMEWORK_PROMPTS / flavor
+    sit_fw_dir = fw_dir / SITUATIONAL_SUBDIR
     task_prompts = task_dir / "prompts"
+    task_sit_dir = task_prompts / SITUATIONAL_SUBDIR
     report = {
         "task": str(task_dir),
         "flavor": flavor,
         "updated": [],
         "added": [],
+        "relocated": [],
+        "removed": [],
         "identical": [],
         "skipped_no_framework": [],
         "errors": [],
     }
     fw_names = {p.name for p in fw_dir.glob("*.md") if p.name != "README.md"}
+    sit_names = {p.name for p in sit_fw_dir.glob("*.md")} if sit_fw_dir.is_dir() else set()
     task_names = {p.name for p in task_prompts.glob("*.md")}
+    # Captured before relocation writes into task_sit_dir, so a file relocated
+    # from the top level isn't then re-reported as an identical situational file.
+    task_sit_names = {p.name for p in task_sit_dir.glob("*.md")} if task_sit_dir.is_dir() else set()
 
+    def _ensure_sit_dir():
+        if not dry_run:
+            task_sit_dir.mkdir(exist_ok=True)
+
+    # Top-level prompts.
     for name in sorted(task_names):
         task_file = task_prompts / name
+        if name in REMOVED_PROMPTS:
+            if not dry_run:
+                task_file.unlink()
+            report["removed"].append(name)
+            continue
+        if name in sit_names:
+            # Moved into situational/: write the canonical copy there, drop the
+            # stale flat copy.
+            _ensure_sit_dir()
+            copy_prompt(sit_fw_dir / name, task_sit_dir / name, dry_run)
+            if not dry_run:
+                task_file.unlink()
+            report["relocated"].append(name)
+            continue
         fw_file = fw_dir / name
         if not fw_file.exists():
             report["skipped_no_framework"].append(name)
@@ -246,6 +291,29 @@ def sync_task(task_dir: Path, flavor: str, dry_run: bool) -> dict:
         task_file = task_prompts / name
         copy_prompt(fw_file, task_file, dry_run)
         report["added"].append(name)
+
+    # Situational subdir.
+    if sit_names:
+        for name in sorted(task_sit_names):
+            if name in REMOVED_PROMPTS:
+                if not dry_run:
+                    (task_sit_dir / name).unlink()
+                report["removed"].append(f"{SITUATIONAL_SUBDIR}/{name}")
+                continue
+            sit_fw_file = sit_fw_dir / name
+            if not sit_fw_file.exists():
+                report["skipped_no_framework"].append(f"{SITUATIONAL_SUBDIR}/{name}")
+                continue
+            if not copy_prompt(sit_fw_file, task_sit_dir / name, dry_run):
+                report["identical"].append(f"{SITUATIONAL_SUBDIR}/{name}")
+                continue
+            report["updated"].append(f"{SITUATIONAL_SUBDIR}/{name}")
+        missing = sorted(sit_names - task_sit_names - set(report["relocated"]))
+        if missing:
+            _ensure_sit_dir()
+        for name in missing:
+            copy_prompt(sit_fw_dir / name, task_sit_dir / name, dry_run)
+            report["added"].append(f"{SITUATIONAL_SUBDIR}/{name}")
 
     return report
 
@@ -288,18 +356,24 @@ def main():
           f"{sum(1 for _, f in tasks if f == 'OtherField')} OtherField)")
     print()
 
-    totals = {"updated": 0, "added": 0, "identical": 0, "skipped_no_framework": 0, "errors": 0}
+    totals = {"updated": 0, "added": 0, "relocated": 0, "removed": 0,
+              "identical": 0, "skipped_no_framework": 0, "errors": 0}
     for task_dir, flavor in tasks:
         rep = sync_task(task_dir, flavor, args.dry_run)
         for key in totals:
             totals[key] += len(rep[key])
         rel = display_path(task_dir, args.workspace)
-        if rep["updated"] or rep["added"] or rep["skipped_no_framework"] or rep["errors"]:
+        if (rep["updated"] or rep["added"] or rep["relocated"] or rep["removed"]
+                or rep["skipped_no_framework"] or rep["errors"]):
             parts = []
             if rep["updated"]:
                 parts.append(f"updated={','.join(rep['updated'])}")
             if rep["added"]:
                 parts.append(f"added={','.join(rep['added'])}")
+            if rep["relocated"]:
+                parts.append(f"relocated={','.join(rep['relocated'])}")
+            if rep["removed"]:
+                parts.append(f"removed={','.join(rep['removed'])}")
             if rep["skipped_no_framework"]:
                 parts.append(f"skipped_no_framework={','.join(rep['skipped_no_framework'])}")
             if rep["errors"]:
@@ -310,12 +384,14 @@ def main():
 
     print()
     print("=" * 70)
-    print(f"  Files updated (overwrite): {totals['updated']}")
-    print(f"  Files added (new):         {totals['added']}")
-    print(f"  Files already identical:   {totals['identical']}")
-    print(f"  Files not in framework:    {totals['skipped_no_framework']}")
+    print(f"  Files updated (overwrite):   {totals['updated']}")
+    print(f"  Files added (new):           {totals['added']}")
+    print(f"  Files relocated to subdir:   {totals['relocated']}")
+    print(f"  Files removed (dropped):     {totals['removed']}")
+    print(f"  Files already identical:     {totals['identical']}")
+    print(f"  Files not in framework:      {totals['skipped_no_framework']}")
     if totals["errors"]:
-        print(f"  Errors:                    {totals['errors']}")
+        print(f"  Errors:                      {totals['errors']}")
     print("=" * 70)
     if args.dry_run:
         print("DRY RUN — no files modified. Re-run without --dry-run to apply.")

@@ -33,11 +33,21 @@
 # Patch kind: namespace function (three targets, same upstream). No S4, no
 # C++ — pure R + parallelDist + mclapply.
 
+# Tell vegan users what to install when the accelerator's extra dependency is
+# absent: the registration gate below would otherwise decline silently and they
+# would see no speedup and no reason why. (parallelDist is a CRAN package vegan
+# itself does not pull in; yaml is needed only by the attest harness, not here.)
+if (requireNamespace("vegan", quietly = TRUE) &&
+    !requireNamespace("parallelDist", quietly = TRUE)) {
+  message("[autozyme] vegan accelerator inactive: ",
+          "install.packages(\"parallelDist\") to enable the adonis2/permutest ",
+          "speedup; vegan runs unaccelerated meanwhile.")
+}
+
 if (requireNamespace("vegan",        quietly = TRUE) &&
     requireNamespace("parallel",     quietly = TRUE) &&
     requireNamespace("parallelDist", quietly = TRUE) &&
-    requireNamespace("permute",      quietly = TRUE) &&
-    requireNamespace("yaml",         quietly = TRUE)) {
+    requireNamespace("permute",      quietly = TRUE)) {
 
   # Originals + internal helpers captured at file scope via getFromNamespace.
   # Fast fns reference these via lexical closure — see CAVEATS.md / convention #3.

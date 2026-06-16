@@ -565,11 +565,14 @@ def _copy_new_pv_rows_to_speedups(item: WorkItem, framework: Path,
         s = (r.get("system_os") or "").lower()
         if "mac" in s or "apple" in s or "darwin" in s:
             return "mac"
-        return "win" if "win" in s else "other"
+        if "win" in s:
+            return "win"
+        return "linux" if "linux" in s else "other"
 
     sig_cols = ("timestamp", "patch_name", "tier", "rep_idx", "variant",
                 "sec", "peak_mb", "system_os", "system_cpu", "system_threads")
-    shard_paths = {p: patch_dir / f"speedups.{p}.tsv" for p in ("mac", "win", "other")}
+    shard_paths = {p: patch_dir / f"speedups.{p}.tsv"
+                   for p in ("mac", "win", "linux", "other")}
     seen: set = set()
     sp_header = pv_header
     for sp in (*shard_paths.values(), patch_dir / "speedups.tsv"):

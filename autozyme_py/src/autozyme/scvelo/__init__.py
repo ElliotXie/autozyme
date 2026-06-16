@@ -206,7 +206,10 @@ def fast_assign_tau(
 # AUTOZYMER_THREADS env var) is picked up live, not frozen at register time.
 # ============================================================
 def fast_get_n_jobs(n_jobs):
-    cpu = auto_threads(cap=os.cpu_count() or 1)
+    # default=None: scvelo's finalized sweeps keep speeding up well past 4
+    # threads (median ~1.78x faster than t4, up to 3.28x), so opt out of the
+    # conservative 4-thread floor and scale to hardware (still capped at 16).
+    cpu = auto_threads(cap=os.cpu_count() or 1, default=None)
     if n_jobs is None:
         return cpu
     if n_jobs == 1:

@@ -1,735 +1,115 @@
-schema_version: 1
+schema_version: 2
 patch: seurat
 ecosystem: r
 upstream_package: Seurat
 autozyme_package: autozyme
-manifest_status: initialized
-last_reviewed: 2026-05-26
-review_context:
-  installed_upstream_versions:
-    Seurat: 5.4.0
-    SeuratObject: 5.4.0
-    sctransform: 0.4.3
-  patch_declares_tested_against:
-    Seurat: 5.4.0
-  source_files:
-    - inst/patches/seurat/patch.R
-    - src/seurat_normalize.cpp
-    - src/seurat_variable_features.cpp
-    - src/seurat_scale.cpp
-    - src/seurat_neighbors.cpp
-    - src/seurat_markers.cpp
-    - src/seurat_sctransform.cpp
-  speedup_storage:
-    canonical_pattern: inst/speedups/seurat_<method>.tsv
-    legacy_removed_pattern: inst/patches/seurat/seurat_<method>.tsv
+last_reviewed: 2026-06-16
 
-global_policy:
-  default_position: default_fast_path_only
-  release_rule: unsupported arguments and unsupported object shapes must fall back to upstream
-  compatibility_target: Seurat 5.4.0
-  speed_claim_rule: "any change marked speed_effect=requires_rebenchmark invalidates headline speedups until retested"
+purpose: >
+  Lightweight inventory for the Seurat patch. This file is documentation only:
+  runtime activation is controlled by inst/patches/seurat/patch.R.
 
-methods:
+truth_source:
+  registration: inst/patches/seurat/patch.R
+  changelog: inst/patches/seurat/CHANGELOG.md
+  contract_tests:
+    - tests/testthat/test-seurat-parameter-policy.R
+    - tests/testthat/test-contract-FindNeighbors.R
+
+policy:
+  unsupported_calls: fall back to upstream Seurat
+  benchmark_claims: keep detailed speed and concordance results in benchmark outputs, not here
+  release_scope: listed targets are included in the Seurat aggregate patch unless status says otherwise
+
+source_files:
+  - inst/patches/seurat/patch.R
+  - src/seurat_normalize.cpp
+  - src/seurat_variable_features.cpp
+  - src/seurat_scale.cpp
+  - src/seurat_neighbors.cpp
+  - src/seurat_runumap.cpp
+  - src/seurat_markers.cpp
+  - src/seurat_sctransform.cpp
+
+targets:
   NormalizeData.Seurat:
     status: active
-    release_risk: low
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: exact_numeric_within_1e-5_on_supported_default_path
-      supported_when:
-        - zyme is TRUE
-        - normalization.method == "LogNormalize"
-        - scale.factor is a finite numeric scalar
-        - margin == 1
-        - assay is NULL or a single assay name
-        - object assay is Seurat v5 Assay5 or StdAssay with a counts layer
-        - output layer is the default data layer
-        - no layer/save behavior is requested through dots
-        - block.size is NULL
-      fallback_when:
-        - zyme is FALSE or turbo is FALSE
-        - normalization.method is not LogNormalize
-        - assay class is not supported by the fast layer-slot path
-        - counts layer is missing
-        - non-default layer/save arguments are present
-        - block.size is non-NULL
-        - margin is not the default value 1
-        - assay is not a single valid assay name
-        - scale.factor is not a finite numeric scalar
-      known_differences:
-        - fast path directly reads and writes Assay5/StdAssay layers after explicit gate checks
-      speed_effect_if_gates_are_fixed: no_expected_effect_on_default_benchmark
-    changes:
-      - id: seurat-normalize-safety-gates-2026-05-24
-        type: safety_gate
-        status: implemented
-        summary: Restrict fast path to finite-scalar LogNormalize on a single StdAssay/Assay5 counts->data target with margin=1, no extra dots, and block.size=NULL; unsupported calls now fall back to upstream and the fast path logs the Seurat command.
-        correctness_effect: improves safety without intended numeric change on the default fast path
-        speed_effect: no_expected_effect_on_default_benchmark
-        files:
-          - inst/patches/seurat/patch.R
-          - inst/patches/seurat/manifest.yml
-        verification_required:
-          - default LogNormalize parity
-          - non-LogNormalize fallback
-          - unsupported assay fallback
-          - custom layer/save fallback
-          - non-default margin fallback
-          - command log exists after fast path
-      - id: seurat-normalize-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry after release-readiness review.
-        correctness_effect: documents required fallback gates
-        speed_effect: none
-        verification_required:
-          - default LogNormalize parity
-          - non-LogNormalize fallback
-          - unsupported assay fallback
-          - custom layer/save fallback
+    contract: gated LogNormalize fast path; unsupported arguments fall back
 
   FindVariableFeatures.Seurat:
     status: active
-    release_risk: medium
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: high_hvg_overlap_on_supported_default_path
-      supported_when:
-        - selection.method == "vst"
-        - default assay resolves to a StdAssay or Assay5 counts layer
-        - default vst arguments are used
-      fallback_when:
-        - zyme is FALSE or turbo is FALSE
-        - selection.method is not vst
-        - assay class is SCTAssay or otherwise needs upstream-specific handling
-        - non-default mean or dispersion behavior is requested
-      known_differences:
-        - current implementation bypasses LogSeuratCommand
-        - current implementation delegates to the fast StdAssay path and may not preserve SCTAssay behavior
-      speed_effect_if_gates_are_fixed: no_expected_effect_on_default_benchmark
-    changes:
-      - id: seurat-fvf-seurat-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry and fallback requirements.
-        correctness_effect: documents unsupported assay and non-default behavior
-        speed_effect: none
-        verification_required:
-          - default vst HVG overlap
-          - SCTAssay fallback
-          - non-vst fallback
+    contract: gated VST fast path
 
   FindVariableFeatures.StdAssay:
     status: active
-    release_risk: high
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: high_hvg_overlap_on_counts_vst_path
-      supported_when:
-        - selection.method == "vst"
-        - layer is NULL or counts
-        - method/key behavior is default
-      fallback_when:
-        - layer is not counts
-        - custom method is supplied
-        - custom key behavior is supplied
-        - selection.method is not vst
-      known_differences:
-        - current implementation always reads the counts layer
-        - current implementation ignores non-default layer/method/key behavior
-      speed_effect_if_gates_are_fixed: no_expected_effect_on_default_benchmark
-    changes:
-      - id: seurat-fvf-stdassay-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry and unsupported layer behavior.
-        correctness_effect: documents required layer gate
-        speed_effect: none
-        verification_required:
-          - counts-layer vst parity
-          - custom layer fallback
-          - custom method fallback
+    contract: gated VST fast path
 
   VST.dgCMatrix:
     status: active
-    release_risk: medium
-    support_policy: numerical_approximation
-    semantic_contract:
-      expected_equivalence: hvg_overlap_threshold_not_bitwise_identity
-      supported_when:
-        - dgCMatrix input
-        - default VST behavior
-      fallback_when:
-        - zyme is FALSE or turbo is FALSE
-      known_differences:
-        - current implementation uses stats:::simpleLoess rather than the upstream loess call
-        - HVG order can drift around ties or loess boundary behavior
-      speed_effect_if_gates_are_fixed: no_expected_effect_on_default_benchmark
-    changes:
-      - id: seurat-vst-dgcmatrix-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry for VST numerical approximation.
-        correctness_effect: documents non-bitwise VST parity expectation
-        speed_effect: none
-        verification_required:
-          - default HVG overlap
-          - variance.standardized distribution comparison
+    contract: numerical HVG overlap contract, not bitwise identity
 
   ScaleData.Seurat:
     status: active
-    release_risk: high
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: numeric_close_on_default_scale_center_path
-      supported_when:
-        - vars.to.regress is NULL
-        - split.by is NULL
-        - model.use == "linear"
-        - use.umi is FALSE
-        - do.scale is TRUE
-        - do.center is TRUE
-        - data layer is dgCMatrix-compatible
-      fallback_when:
-        - latent.data or dots contain unsupported behavior
-        - features are empty or unresolved
-        - non-default regression/split/scale/center path is requested
-      known_differences:
-        - current C++ kernel applies symmetric clipping while Seurat 5.4.0 FastSparseRowScale only caps positive values
-        - current implementation does not call LogSeuratCommand
-      speed_effect_if_gates_are_fixed: no_expected_effect_on_default_benchmark
-    changes:
-      - id: seurat-scaledata-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry for ScaleData gates and clipping difference.
-        correctness_effect: documents semantic drift requiring decision
-        speed_effect: none
-        verification_required:
-          - default numeric parity
-          - no-variable-features behavior
-          - regression fallback
-          - clipping behavior audit
+    contract: gated default scale/center path
 
   FindNeighbors.Seurat:
     status: active
-    release_risk: medium
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: approximate_neighbor_graph_similarity
-      supported_when:
-        - reduction is provided and dims is not NULL
-        - nn.method == "annoy"
-        - annoy.metric == "euclidean"
-        - return.neighbor is FALSE
-        - l2.norm is FALSE
-        - cache.index is FALSE
-        - do.plot is FALSE
-      fallback_when:
-        - dims is NULL
-        - feature or assay path is requested
-        - return.neighbor/cache.index/do.plot/l2.norm is requested
-        - nn.method or annoy.metric differs from supported defaults
-      known_differences:
-        - fast path directly builds Annoy index and SNN graph
-        - exact graph may differ because Annoy is approximate
-      speed_effect_if_gates_are_fixed: no_expected_effect_on_default_benchmark
-    changes:
-      - id: seurat-findneighbors-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry for supported Annoy graph path.
-        correctness_effect: documents unsupported neighbor modes
-        speed_effect: none
-        verification_required:
-          - graph-density comparison
-          - dims=NULL fallback
-          - return.neighbor fallback
-          - cache.index fallback
+    contract: exact float32 Euclidean kNN on the supported PCA/dims path; not bitwise-identical to Seurat Annoy
+    evidence:
+      - tests/testthat/test-contract-FindNeighbors.R
+      - lib_scblas/e2e/find_neighbors/out_seurat_findneighbors_shared_full_thread_sweep.tsv
 
   FindAllMarkers:
     status: active
-    release_risk: blocking
-    support_policy: narrow_wilcox_default_fast_path
-    semantic_contract:
-      expected_equivalence: marker_rank_and_pvalue_close_on_supported_path
-      supported_when:
-        - test.use == "wilcox"
-        - slot == "data"
-        - features is NULL
-        - group.by is NULL or ident
-        - only.pos is FALSE
-        - densify is FALSE
-        - min.diff.pct == -Inf
-        - max.cells.per.ident is Inf
-        - base == 2
-      fallback_when:
-        - any unsupported differential-expression option is supplied
-        - data layer is not dgCMatrix
-        - identity names cannot be aligned to cells
-      known_differences:
-        - current smoke test calls only.pos=TRUE and therefore does not exercise the fast path
-        - current C++ tie correction excludes a repeated final nonzero tie group
-        - fast path uses a custom normal-approximation Wilcoxon implementation rather than all upstream branches
-      speed_effect_if_gates_are_fixed: may_change_if_pvalue_bug_or_test_coverage_is_fixed
-    changes:
-      - id: seurat-findallmarkers-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry records blocking tie-correction and test-coverage issues.
-        correctness_effect: documents known correctness risk
-        speed_effect: requires_rebenchmark
-        verification_required:
-          - fast-path smoke with only.pos FALSE
-          - synthetic tie-heavy p-value parity
-          - small-cluster behavior
-          - top-marker overlap by cluster
+    contract: gated Wilcoxon marker path
 
-  RunUMAP.Seurat:
-    status: retired
-    release_risk: none
-    support_policy: not_registered
-    semantic_contract:
-      expected_equivalence: not_applicable
-      supported_when:
-        - never; RunUMAP is no longer part of the packaged Seurat patch surface
-      fallback_when:
-        - all calls use stock Seurat
-      known_differences:
-        - retired after matched-parameter audit showed historical speedup was configuration-driven
-      speed_effect_if_gates_are_fixed: not_counted
-    changes:
-      - id: seurat-runumap-retired-2026-05-25
-        type: release_scope_change
-        status: implemented
-        summary: Remove RunUMAP.Seurat from the registered Seurat patch targets; UMAP is not counted or published as an autozyme Seurat speedup.
-        correctness_effect: avoids presenting a configuration-driven approximate UMAP result as an implementation speedup
-        speed_effect: removes UMAP from headline/package speedup accounting
-        files:
-          - inst/patches/seurat/patch.R
-          - inst/patches/seurat/manifest.yml
-          - tests/testthat/test-seurat-parameter-policy.R
-          - inst/speedups/seurat_umap.tsv
-        verification_observed:
-          - 2026-05-25 fair small-tier comparison with stock uwot.approx_pow=TRUE and matched workers showed autozyme approx at 0.99x, 1.01x, and 1.03x for 1, 4, and 32 threads
-      - id: seurat-runumap-seurat-initial-ledger-2026-05-24
-        type: docs_only
-        status: superseded_by_retirement
-        summary: Initial ledger entry for dispatcher wrapper.
-        correctness_effect: documents dependency on default method contract
-        speed_effect: none
-        verification_required:
-          - none after 2026-05-25 retirement; all calls use stock Seurat
-
-  RunUMAP.default:
-    status: retired
-    release_risk: none
-    support_policy: not_registered
-    semantic_contract:
-      expected_equivalence: not_applicable
-      supported_when:
-        - never; RunUMAP.default is no longer registered by autozyme
-      fallback_when:
-        - all calls use stock Seurat
-      known_differences:
-        - historical autozyme UMAP results used an explicit approximate configuration and are retained only in task-local provenance
-      speed_effect_if_gates_are_fixed: not_counted
-    changes:
-      - id: seurat-runumap-default-retired-2026-05-25
-        type: release_scope_change
-        status: implemented
-        summary: Remove RunUMAP.default from package registration and delete the bundled seurat_umap speedup snapshot.
-        correctness_effect: prevents accidental monkey-patching of Seurat UMAP and removes unfair default-vs-approximate benchmark claims
-        speed_effect: removes UMAP from package speedup accounting
-        files:
-          - inst/patches/seurat/patch.R
-          - inst/speedups/seurat_umap.tsv
-          - inst/patches/seurat/manifest.yml
-          - scripts/seurat_attest_manifest.yaml
-        verification_observed:
-          - 2026-05-25 fair small-tier comparison with stock uwot.approx_pow=TRUE and matched workers: stock/autozyme seconds were 46.760/47.410 at 1 thread, 33.260/32.770 at 4 threads, and 29.240/28.360 at 32 threads; min_dim_cor was 1.000000 in all cases
-      - id: seurat-runumap-default-honor-uwot-controls-2026-05-25
-        type: semantic_fix
-        status: superseded_by_retirement
-        summary: Fast path now honors uwot.approx_pow and falls back for non-default n.epochs, metric.kwds, and angular.rp.forest instead of silently overriding them.
-        correctness_effect: removes parameter override risk on default and non-default uwot calls
-        speed_effect: no_longer_counted_after_retirement
-        files:
-          - inst/patches/seurat/patch.R
-          - tests/testthat/test-seurat-parameter-policy.R
-          - inst/patches/seurat/manifest.yml
-        verification_required:
-          - none after 2026-05-25 retirement; all calls use stock Seurat
-        verification_observed:
-          - 2026-05-25 small tier cached-baseline attest passed: min_dim_cor=1.000000, patched median 96.524s vs cached baseline 102.812s, speedup_x=1.06
-      - id: seurat-runumap-default-initial-ledger-2026-05-24
-        type: docs_only
-        status: superseded_by_retirement
-        summary: Initial ledger entry records parameter overrides that need gates or reversal.
-        correctness_effect: documents semantic shortcut risk
-        speed_effect: no_longer_counted_after_retirement
-        verification_required:
-          - none after 2026-05-25 retirement; all calls use stock Seurat
+  FindMarkers.Seurat:
+    status: active
+    contract: gated Wilcoxon marker path
 
   RunPCA.StdAssay:
     status: active
-    release_risk: high
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: stdev_and_embedding_close_up_to_sign
-      supported_when:
-        - layer == "scale.data"
-        - requested features are present and have nonzero variance
-        - default PrepDR5 behavior is not required beyond the supported feature set
-      fallback_when:
-        - feature filtering or warnings differ from PrepDR5 expectations
-        - unsupported layer behavior is requested
-      known_differences:
-        - current implementation bypasses Seurat PrepDR5 filtering and warnings
-      speed_effect_if_gates_are_fixed: no_expected_effect_on_default_benchmark_if_feature_set_is_clean
-    changes:
-      - id: seurat-runpca-stdassay-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry for PrepDR5 bypass risk.
-        correctness_effect: documents required feature filtering tests
-        speed_effect: none
-        verification_required:
-          - default PCA parity up to sign
-          - zero-variance feature fallback or equivalent filtering
-          - missing feature behavior
+    contract: gated PCA path; embeddings/loadings close up to sign
 
   RunPCA.default:
     status: active
-    release_risk: medium
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: stdev_and_embedding_close_up_to_sign
-      supported_when:
-        - rev.pca is FALSE
-        - approx is TRUE
-        - dense or dgCMatrix input can be converted safely to float64 array
-        - dots do not request irlba/prcomp-specific behavior
-      fallback_when:
-        - approx is FALSE
-        - rev.pca is TRUE
-        - Python or required modules are unavailable
-        - dots contain unsupported SVD parameters
-      known_differences:
-        - current implementation omits misc$total.variance
-        - current implementation may ignore upstream SVD arguments in dots
-      speed_effect_if_gates_are_fixed: no_expected_effect_on_default_benchmark
-    changes:
-      - id: seurat-runpca-default-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry for Python PCA fast path.
-        correctness_effect: documents approx and metadata requirements
-        speed_effect: none
-        verification_required:
-          - default stdev parity
-          - embedding parity up to sign
-          - approx=FALSE fallback
-          - misc$total.variance parity
+    contract: gated PCA path; embeddings/loadings close up to sign
 
   RunCCA.default:
     status: active
-    release_risk: medium
-    support_policy: numerical_approximation
-    semantic_contract:
-      expected_equivalence: singular_values_close_and_embeddings_finite
-      supported_when:
-        - standardize behavior is default
-        - num.cc is valid for matrix dimensions
-        - dots do not request irlba-specific behavior
-        - Python scipy PROPACK path is available
-      fallback_when:
-        - Python or scipy is unavailable
-        - dots contain unsupported SVD parameters
-      known_differences:
-        - current implementation uses float32 inputs before cross-product
-        - current implementation uses scipy.sparse.linalg.svds rather than irlba
-        - on macOS, Python native threadpools are clamped to 1 for the CCA fast path; if the guard is unavailable, this path falls back to upstream Seurat
-      speed_effect_if_gates_are_fixed: no_expected_effect_on_default_benchmark
-    changes:
-      - id: seurat-runcca-macos-blas-thread-guard-2026-05-25
-        type: stability_fix
-        status: manual_sanity_passed_needs_package_attest_refresh
-        summary: Clamp Python native threadpools to one thread on macOS while running the reticulate-backed CCA matmul/SVD fast path; fall back to upstream when the guard is unavailable.
-        correctness_effect: prevents native segfaults caused by mixed R/Python BLAS/OpenMP runtimes under ambient multi-thread env vars
-        speed_effect: macOS integrate_cca remains a 1-thread-only speed claim; no supported multi-thread speedup should be published
-        files:
-          - inst/patches/seurat/patch.R
-          - inst/patches/seurat/manifest.yml
-          - inst/final_audit/seurat.md
-        verification_required:
-          - reinstall package and confirm small-tier Mac CCA no longer crashes under ambient OMP/OPENBLAS > 1
-          - keep integrate_cca attest matrix to thread=1 unless a real ZYME_THREADS-aware parallel implementation is added
-        verification_observed:
-          - 2026-05-25 diagnosis: activate('seurat') alone succeeded at 4/14 threads, trace stopped in patched RunCCA.default, and macOS crash report faulted inside OpenMP barrier / BLAS worker frames
-          - 2026-05-25 after clamping all threadpoolctl-managed Python native pools, manual Mac small-tier sanity passed under ambient OMP/OPENBLAS/MKL/VECLIB/ZYME_THREADS=4 and =8
-      - id: seurat-runcca-default-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry for Python CCA SVD path.
-        correctness_effect: documents numerical approximation
-        speed_effect: none
-        verification_required:
-          - singular value ratio
-          - shape and finite output
-          - unsupported dots fallback
+    contract: gated numerical CCA path
 
   RunCCA.Seurat:
     status: active
-    release_risk: high
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: CCA_embedding_similarity_on_default_no_rescale_path
-      supported_when:
-        - rescale is FALSE
-        - renormalize is FALSE
-        - compute.gene.loadings is FALSE or explicitly supported
-        - merge.data behavior matches upstream
-      fallback_when:
-        - rescale is TRUE
-        - renormalize is TRUE
-        - compute.gene.loadings is TRUE and ProjectDim parity is required
-        - add.cell.id or merge behavior cannot be reproduced
-      known_differences:
-        - current implementation uses merge.data=FALSE while upstream uses merge.data=TRUE
-        - current implementation does not run ProjectDim even though upstream default compute.gene.loadings is TRUE
-      speed_effect_if_gates_are_fixed: may_reduce_headline_speedup_if_gene_loadings_are_required
-    changes:
-      - id: seurat-runcca-seurat-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry records upstream behavior gaps.
-        correctness_effect: documents semantic mismatch requiring gates
-        speed_effect: requires_rebenchmark
-        verification_required:
-          - default RunCCA.Seurat parity
-          - compute.gene.loadings behavior
-          - rescale fallback
-          - renormalize fallback
+    contract: gated Seurat CCA path
 
   FindIntegrationAnchors:
     status: active
-    release_risk: high
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: anchor_set_similarity_with_stock_parameters
-      supported_when:
-        - reduction == "cca"
-        - normalization.method == "LogNormalize"
-        - n.trees matches upstream default unless user explicitly opts into faster approximate mode
-      fallback_when:
-        - reduction is rpca, jpca, or rlsi
-        - normalization.method == "SCT" and SCT-specific behavior is required
-        - reference behavior is not fully reproduced
-      known_differences:
-        - default n.trees now matches upstream at 50; callers may explicitly pass smaller values for speed
-        - current implementation is CCA-shaped while signature accepts multiple reductions
-      speed_effect_if_gates_are_fixed: likely_reduces_headline_speedup
-    changes:
-      - id: seurat-findintegrationanchors-ntrees-default-2026-05-25
-        type: semantic_fix
-        status: full_tier_attested_3_datasets
-        summary: Restore upstream n.trees=50 default and keep smaller Annoy tree counts as explicit caller opt-in only.
-        correctness_effect: removes silent anchor-recall shortcut from default calls
-        speed_effect: requires_rebenchmark
-        files:
-          - inst/patches/seurat/patch.R
-          - tests/testthat/test-seurat-parameter-policy.R
-          - inst/patches/seurat/manifest.yml
-        verification_required:
-          - explicit n.trees honored
-          - full baseline/reference attest for newly added integrate_cca OOD tiers
-        verification_observed:
-          - 2026-05-25 integrate_cca full cached-baseline sweep on ifnb_cca/tms_ss2_cca/gastrulation_pijuansala_cca passed all tiers and 1/4/full thread settings; min_cc_cor >= 0.999839, cc_dim_cor_mean >= 0.999929; speedup_x ranges small 2.3-2.5, medium 11.6-17.7, large 11.5-20.1.
-          - 2026-05-25 integrate_cca task expanded to six CCA-ready datasets by adding heart_adult_cca, pbmc200k_glaucoma_cca, and deterministic donor-balanced pbmc160k_cite_cca; new tiers passed load/layer/PCA sanity checks but not full attest yet.
-      - id: seurat-findintegrationanchors-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry records default n.trees semantic shortcut.
-        correctness_effect: documents blocking release risk
-        speed_effect: requires_rebenchmark
-        verification_required:
-          - stock n.trees=50 parity
-          - n.trees=10 opt-in documentation if retained
-          - rpca/jpca/rlsi fallback
-          - SCT fallback
+    contract: gated CCA integration path
 
   FindWeights:
     status: active
-    release_risk: medium
-    support_policy: upstream_delegate_with_parameter_policy
-    semantic_contract:
-      expected_equivalence: upstream_equivalence_when_parameters_match
-      supported_when:
-        - n.trees uses upstream default unless user explicitly passes a different value
-      fallback_when:
-        - zyme is FALSE or turbo is FALSE should preserve upstream defaults
-      known_differences:
-        - default n.trees now matches upstream at 50; callers may explicitly pass smaller values for speed
-      speed_effect_if_gates_are_fixed: likely_reduces_headline_speedup
-    changes:
-      - id: seurat-findweights-ntrees-default-2026-05-25
-        type: semantic_fix
-        status: full_tier_attested_3_datasets
-        summary: Restore upstream n.trees=50 default in the FindWeights wrapper and honor explicit caller values.
-        correctness_effect: removes silent approximate-neighbor shortcut from default calls
-        speed_effect: requires_rebenchmark
-        files:
-          - inst/patches/seurat/patch.R
-          - tests/testthat/test-seurat-parameter-policy.R
-          - inst/patches/seurat/manifest.yml
-        verification_required:
-          - default parameter parity
-          - explicit n.trees honored
-          - full baseline/reference attest for newly added integrate_cca OOD tiers
-        verification_observed:
-          - 2026-05-25 covered through integrate_cca full cached-baseline sweep on ifnb_cca/tms_ss2_cca/gastrulation_pijuansala_cca; all tiers and 1/4/full thread settings passed; min_cc_cor >= 0.999839, cc_dim_cor_mean >= 0.999929; speedup_x ranges small 2.3-2.5, medium 11.6-17.7, large 11.5-20.1.
-          - 2026-05-25 integrate_cca task expanded to six CCA-ready datasets by adding heart_adult_cca, pbmc200k_glaucoma_cca, and deterministic donor-balanced pbmc160k_cite_cca; new tiers passed load/layer/PCA sanity checks but not full attest yet.
-      - id: seurat-findweights-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry records default n.trees mismatch.
-        correctness_effect: documents blocking release risk
-        speed_effect: requires_rebenchmark
-        verification_required:
-          - zyme TRUE default matches upstream parameters
-          - zyme FALSE default matches upstream parameters
-          - explicit n.trees honored
+    contract: upstream-compatible integration weights path
 
   CCAIntegration:
     status: active
-    release_risk: medium
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: integration_embedding_similarity_when_parameters_match
-      supported_when:
-        - dims and k.weight are honored exactly
-        - downstream FindIntegrationAnchors and FindWeights contracts are satisfied
-      fallback_when:
-        - unsupported integration options are supplied
-      known_differences:
-        - CCAIntegration now forwards caller dims and k.weight exactly
-      speed_effect_if_gates_are_fixed: may_reduce_headline_speedup
-    changes:
-      - id: seurat-ccaintegration-forward-dims-kweight-2026-05-25
-        type: semantic_fix
-        status: full_tier_attested_3_datasets
-        summary: Forward caller-supplied dims and k.weight to upstream CCAIntegration instead of pinning defaults in the zyme path.
-        correctness_effect: removes silent user-argument override
-        speed_effect: no_expected_effect_on_default_benchmark
-        files:
-          - inst/patches/seurat/patch.R
-          - tests/testthat/test-seurat-parameter-policy.R
-          - inst/patches/seurat/manifest.yml
-        verification_required:
-          - custom dims honored or fallback
-          - custom k.weight honored or fallback
-          - full baseline/reference attest for newly added integrate_cca OOD tiers
-        verification_observed:
-          - 2026-05-25 integrate_cca full cached-baseline sweep on ifnb_cca/tms_ss2_cca/gastrulation_pijuansala_cca passed all tiers and 1/4/full thread settings; min_cc_cor >= 0.999839, cc_dim_cor_mean >= 0.999929; speedup_x ranges small 2.3-2.5, medium 11.6-17.7, large 11.5-20.1.
-          - 2026-05-25 integrate_cca task expanded to six CCA-ready datasets by adding heart_adult_cca, pbmc200k_glaucoma_cca, and deterministic donor-balanced pbmc160k_cite_cca; new tiers passed load/layer/PCA sanity checks but not full attest yet.
-      - id: seurat-ccaintegration-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry records parameter pinning.
-        correctness_effect: documents blocking release risk
-        speed_effect: requires_rebenchmark
-        verification_required:
-          - custom dims honored or fallback
-          - custom k.weight honored or fallback
-          - default integration parity
-
-  SCTransform.default:
-    status: active
-    release_risk: blocking
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: residual_statistics_close_on_supported_default_v2_path
-      supported_when:
-        - reference.SCT.model is NULL
-        - residual.features is NULL
-        - vars.to.regress is NULL
-        - latent.data is NULL
-        - do.scale is FALSE
-        - do.center is TRUE
-        - conserve.memory is FALSE
-        - return.only.var.genes is TRUE
-        - residual_type behavior is pearson-compatible
-      fallback_when:
-        - reference model is supplied
-        - residual.features is supplied
-        - vars.to.regress or latent.data is supplied
-        - do.scale or do.center are non-default
-        - conserve.memory path is requested
-      known_differences:
-        - current implementation forces sctransform::vst residual_type to none
-        - current implementation forces bin_size to 15000
-        - current implementation reconstructs residuals and corrected counts outside upstream SCT branches
-      speed_effect_if_gates_are_fixed: may_reduce_headline_speedup
-    changes:
-      - id: seurat-sctransform-default-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry records SCT branch coverage risks.
-        correctness_effect: documents blocking release risk
-        speed_effect: requires_rebenchmark
-        verification_required:
-          - default v2 residual statistics
-          - reference.SCT.model fallback
-          - residual.features fallback
-          - vars.to.regress fallback
-          - do.scale/do.center behavior
-      - id: seurat-sctransform-default-gates-2026-05-26
-        type: runtime_safety
-        status: implemented
-        summary: Fast path now falls back upstream unless the default v2 SCT contract is satisfied.
-        correctness_effect: prevents unverified SCT branches from taking the accelerator
-        speed_effect: unchanged for default v2; unsupported branches use upstream speed
-        verification_required:
-          - default v2 package attest after gate change
-          - unsupported-argument fallback smoke tests
+    contract: gated CCAIntegration path
 
   SCTransform.Seurat:
     status: active
-    release_risk: blocking
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: SCT_assay_structure_and_residual_statistics_close
-      supported_when:
-        - assay is a standard RNA assay with counts
-        - default SCTransform.default contract is satisfied
-      fallback_when:
-        - assay is SCT and upstream would reroute to RNA with warning
-        - reference model or second regression behavior is requested
-        - non-default SCT behavior is requested
-      known_differences:
-        - current implementation depends on the fast SCTransform.default contract
-        - current implementation manually constructs SCTAssay slots
-      speed_effect_if_gates_are_fixed: may_reduce_headline_speedup
-    changes:
-      - id: seurat-sctransform-seurat-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry records Seurat wrapper SCT risks.
-        correctness_effect: documents required default-path gating
-        speed_effect: requires_rebenchmark
-        verification_required:
-          - SCT assay structure parity
-          - variable feature overlap
-          - scale.data residual statistics
-          - unsupported SCT option fallback
-      - id: seurat-sctransform-seurat-gates-2026-05-26
-        type: runtime_safety
-        status: implemented
-        summary: Seurat wrapper now returns to upstream for SCT assays and non-default SCT options.
-        correctness_effect: prevents silent behavior changes for reference models, regression, residual subsets, custom VST args, and unsupported SCT branches
-        speed_effect: unchanged for default v2; unsupported branches use upstream speed
-        verification_required:
-          - default v2 package attest after gate change
-          - unsupported-argument fallback smoke tests
+    contract: gated default v2 SCT path
+
+  SCTransform.default:
+    status: active
+    contract: gated default v2 SCT path
+
+  RunUMAP.Seurat:
+    status: active_when_uwot_available
+    contract: registered by the Seurat aggregate patch when uwot is installed; unsupported parameters fall back
+    evidence:
+      - tests/testthat/test-seurat-parameter-policy.R
+
+retired_targets:
+  RunUMAP.default:
+    status: retired
+    reason: not registered by the Seurat aggregate patch

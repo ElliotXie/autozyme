@@ -30,6 +30,11 @@ suppressPackageStartupMessages({
 autozyme:::.sync_worker_thread_options()
 
 .parse_args <- function(argv) {
+  # Rscript -e '...' --args foo ... leaks the literal --args sentinel into
+  # commandArgs(trailingOnly = TRUE) on R 4.5.0 (Mac/Linux). The file-mode
+  # `Rscript file.R --args foo ...` form does NOT — the script-name boundary
+  # consumes it. Filter it out here so the CLI's -e spawn pattern is robust.
+  argv <- argv[argv != "--args"]
   out <- list(activate = FALSE)
   i <- 1L
   while (i <= length(argv)) {

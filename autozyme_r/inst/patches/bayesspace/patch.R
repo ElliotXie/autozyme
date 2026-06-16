@@ -24,8 +24,7 @@
 # original on with_disabled() / zyme=FALSE.
 
 if (requireNamespace("BayesSpace",              quietly = TRUE) &&
-    requireNamespace("SingleCellExperiment",    quietly = TRUE) &&
-    requireNamespace("yaml",                    quietly = TRUE)) {
+    requireNamespace("SingleCellExperiment",    quietly = TRUE)) {
 
   # ============================================================
   # File-scope captures (convention #3).

@@ -1,302 +1,93 @@
-schema_version: 1
+schema_version: 2
 patch: scanpy
 ecosystem: python
 upstream_package: scanpy
 autozyme_package: autozyme
-manifest_status: initialized
-last_reviewed: 2026-05-26
-review_context:
-  patch_declares_tested_against:
-    scanpy: 1.11.5
-  source_files:
-    - src/autozyme/scanpy/__init__.py
-    - src/autozyme/scanpy/_normalize.py
-    - src/autozyme/scanpy/_highly_variable.py
-    - src/autozyme/scanpy/_scale.py
-    - src/autozyme/scanpy/_pca.py
-    - src/autozyme/scanpy/_leiden.py
-    - src/autozyme/scanpy/_rank_genes.py
-    - src/autozyme/scanpy/_prepare.py
-  speedup_storage:
-    canonical_pattern: src/autozyme/scanpy_<method>/speedups_finalized.tsv
+last_reviewed: 2026-06-16
 
-global_policy:
-  default_position: default_fast_path_only
-  release_rule: unsupported arguments, unsupported dtypes, unsupported sparse formats, and unsupported AnnData state must fall back to upstream
-  compatibility_target: scanpy 1.11.5
-  speed_claim_rule: "any change marked speed_effect=requires_rebenchmark invalidates headline speedups until retested"
+purpose: >
+  Lightweight inventory for the Scanpy patch. This file is documentation only:
+  runtime activation is controlled by src/autozyme/scanpy/__init__.py.
 
-methods:
+truth_source:
+  registration: src/autozyme/scanpy/__init__.py
+  package_data: pyproject.toml
+  e2e_results:
+    - lib_scblas/e2e/find_neighbors/out_scanpy_neighbors_shared_4tier.tsv
+    - lib_scblas/e2e/find_neighbors/out_scanpy_neighbors_shared_4tier.md
+
+policy:
+  unsupported_calls: fall back to upstream Scanpy
+  benchmark_claims: keep detailed speed and concordance results in benchmark outputs, not here
+  release_scope: listed public targets are included in the Scanpy aggregate patch unless status says otherwise
+
+source_files:
+  - src/autozyme/scanpy/__init__.py
+  - src/autozyme/scanpy/_normalize.py
+  - src/autozyme/scanpy/_highly_variable.py
+  - src/autozyme/scanpy/_scale.py
+  - src/autozyme/scanpy/_pca.py
+  - src/autozyme/scanpy/_neighbors.py
+  - src/autozyme/scanpy/_umap.py
+  - src/autozyme/scanpy/_leiden.py
+  - src/autozyme/scanpy/_rank_genes.py
+  - src/autozyme/scanpy/_prepare.py
+
+targets:
   scanpy.preprocessing.normalize_total:
     status: active
-    release_risk: medium
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: numeric_close_on_supported_csr_path
-      supported_when:
-        - target_sum is supported
-        - AnnData X or selected layer is CSR-compatible
-        - exclude_highly_expressed is False
-        - key_added behavior is supported or explicitly tested
-      fallback_when:
-        - unsupported sparse or dense layout
-        - unsupported layer/obsm path
-        - exclude_highly_expressed is True
-        - unsupported copy/inplace behavior is requested
-      known_differences: []
-      speed_effect_if_gates_are_fixed: no_expected_effect_on_default_benchmark
-    changes:
-      - id: scanpy-normalize-total-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry for normalize_total fast path.
-        correctness_effect: documents required supported-state gates
-        speed_effect: none
-        verification_required:
-          - default CSR parity
-          - layer fallback or parity
-          - exclude_highly_expressed fallback
-          - copy/inplace behavior
+    contract: gated CSR-compatible normalize_total path
 
   scanpy.preprocessing.log1p:
     status: active
-    release_risk: medium
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: numeric_close_on_supported_sparse_path
-      supported_when:
-        - X or selected layer is sparse CSR/CSC-compatible as implemented
-        - chunked is False
-        - copy behavior is supported
-      fallback_when:
-        - chunked processing is requested
-        - unsupported target attribute is requested
-        - unsupported dtype or sparse format is encountered
-      known_differences: []
-      speed_effect_if_gates_are_fixed: no_expected_effect_on_default_benchmark
-    changes:
-      - id: scanpy-log1p-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry for log1p fast path.
-        correctness_effect: documents fallback requirements
-        speed_effect: none
-        verification_required:
-          - default sparse parity
-          - chunked fallback
-          - layer/copy behavior
-
-  scanpy.preprocessing.highly_variable_genes:
-    status: active
-    release_risk: high
-    support_policy: flavor_specific_fast_path
-    semantic_contract:
-      expected_equivalence: hvg_overlap_and_metric_close_on_supported_flavor
-      supported_when:
-        - flavor is seurat without batch_key on sparse log-normalized data
-        - flavor is seurat_v3 or seurat_v3_paper with batch_key on CSR raw counts
-        - n_top_genes and binning behavior match upstream contract
-      fallback_when:
-        - unsupported flavor
-        - unsupported batch_key path or missing/NA batch labels
-        - unsupported layer/state/dtype
-        - seurat_v3 path requests subset, inplace=False, dense input, or non-CSR sparse input
-      known_differences: []
-      speed_effect_if_gates_are_fixed: requires_rebenchmark_for_seurat_v3_batch
-    changes:
-      - id: scanpy-hvg-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry for highly_variable_genes fast path.
-        correctness_effect: documents flavor-specific contract
-        speed_effect: none
-        verification_required:
-          - flavor=seurat default parity
-          - unsupported flavor fallback
-          - batch_key fallback or parity
-      - id: scanpy-hvg-seurat-v3-batch-fastpath-2026-05-25
-        type: implementation
-        status: attested_full_thread_matrix
-        summary: Add gated CSR fast path for batch-aware seurat_v3/seurat_v3_paper HVG.
-        correctness_effect: expands supported fast path; unsupported states fall back
-        speed_effect: 1t_3.4x_to_4.5x__4t_6.4x_to_9.3x__32t_6.1x_to_9.0x
-        verification_required:
-          - seurat_v3_paper batch HVG parity on raw-count CSR data: passed
-          - package attest for highly_variable_v3_batch 5 tiers x 1/4/32 threads: passed
-          - check_values validation fused into first CSR statistics pass while preserving upstream non-integer warning
-          - fallback for dense/non-CSR and unsupported inplace/subset states
-      - id: scanpy-hvg-seurat-v3-check-values-fused-2026-05-25
-        type: semantic_fix
-        status: attested_full_thread_matrix
-        summary: Keep seurat_v3 batch fast path active when check_values finds non-integer data.
-        correctness_effect: matches upstream warning-and-continue behavior instead of falling back or skipping validation
-        speed_effect: restores package attest from 1.1x small-only to passing 5-tier x 1/4/32-thread matrix
-        verification_required:
-          - non-integer input emits the same UserWarning class and keeps the fast path active
-          - upstream parity on HVG mask, normalized variance, and batch-count labels: passed
-          - zyme attest highly_variable_v3_batch 5 tiers x 1/4/32 threads reps=2: passed
+    contract: gated sparse log1p path
 
   scanpy.preprocessing.scale:
     status: active
-    release_risk: medium
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: numeric_close_on_supported_path
-      supported_when:
-        - zero_center and max_value behavior are supported
-        - selected layer/mask behavior is supported
-        - sparse/dense dtype is supported
-      fallback_when:
-        - mask_obs or unsupported layer path is requested
-        - unsupported copy behavior is requested
-        - unsupported dtype or sparse layout is encountered
-      known_differences: []
-      speed_effect_if_gates_are_fixed: no_expected_effect_on_default_benchmark
-    changes:
-      - id: scanpy-scale-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry for scale fast path.
-        correctness_effect: documents supported-state gates
-        speed_effect: none
-        verification_required:
-          - default parity
-          - max_value parity
-          - mask/layer fallback
+    contract: gated scale path
+
+  scanpy.preprocessing.highly_variable_genes:
+    status: active
+    contract: gated flavor-specific HVG path
+
+  scanpy.preprocessing.neighbors:
+    status: active
+    contract: supported UMAP/euclidean/PCA graph fast path; graph concordance contract, not exact sparse equality
+    aliases:
+      - scanpy.neighbors.neighbors
+    evidence:
+      - lib_scblas/e2e/find_neighbors/out_scanpy_neighbors_shared_4tier.tsv
+      - lib_scblas/e2e/find_neighbors/out_scanpy_neighbors_shared_4tier.md
 
   scanpy.tools.pca:
     status: active
-    release_risk: high
-    support_policy: default_fast_path_only
-    semantic_contract:
-      expected_equivalence: variance_and_embeddings_close_up_to_sign
-      supported_when:
-        - svd_solver/use_highly_variable/zero_center behavior is supported
-        - n_comps is valid for matrix dimensions
-        - dtype/layout is supported
-      fallback_when:
-        - unsupported solver
-        - unsupported layer/mask/chunked behavior
-        - unsupported random_state semantics
-      known_differences: []
-      speed_effect_if_gates_are_fixed: depends_on_solver_coverage
-    changes:
-      - id: scanpy-pca-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry for PCA fast path.
-        correctness_effect: documents solver and state gates
-        speed_effect: none
-        verification_required:
-          - variance parity
-          - embeddings parity up to sign
-          - unsupported solver fallback
-          - use_highly_variable behavior
+    contract: gated PCA path; embeddings close up to sign
+    aliases:
+      - scanpy.preprocessing.pca
+      - scanpy.preprocessing._pca.pca
+
+  scanpy.tools.umap:
+    status: active
+    contract: gated UMAP layout path; neighborhood structure contract, not coordinate identity
+    aliases:
+      - scanpy.tools._umap.umap
 
   scanpy.tools.leiden:
     status: active
-    release_risk: high
-    support_policy: narrow_graph_fast_path
-    semantic_contract:
-      expected_equivalence: clustering_similarity_with_matching_parameters
-      supported_when:
-        - flavor is igraph or explicitly supported
-        - directed and n_iterations behavior match upstream
-        - adjacency/neighbors state is supported
-      fallback_when:
-        - unsupported flavor
-        - unsupported adjacency input
-        - partition_type or extra options cannot be matched
-      known_differences: []
-      speed_effect_if_gates_are_fixed: may_change_if_additional_upstream_options_fallback
-    changes:
-      - id: scanpy-leiden-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry for leiden fast path.
-        correctness_effect: documents graph and flavor gates
-        speed_effect: none
-        verification_required:
-          - adjusted rand or label consistency metric
-          - unsupported flavor fallback
-          - custom adjacency fallback or parity
-      - id: scanpy-leiden-scblas-graph-extract-2026-06-01
-        type: implementation
-        status: requires_rebenchmark
-        summary: Route the supported flavor="igraph" simple-graph extraction through opt-in scBLAS CSR upper-edge extraction when AUTOZYME_SCBLAS_LEIDEN=1, falling back to SciPy triu when unavailable.
-        correctness_effect: preserves leidenalg fallback and adds fallback for restrict_to, directed, and partition_type states
-        speed_effect: requires_rebenchmark
-        verification_required:
-          - scBLAS extraction exact parity vs scipy.sparse.triu on representative connectivities
-          - flavor="leidenalg" still delegates upstream
-          - flavor="igraph" ARI/label parity on supported Scanpy graph inputs
-          - package speed rebenchmark with and without AUTOZYME_SCBLAS_LEIDEN
+    contract: gated graph clustering path
+    aliases:
+      - scanpy.tools._leiden.leiden
 
   scanpy.tools.rank_genes_groups:
     status: active
-    release_risk: high
-    support_policy: narrow_wilcoxon_fast_path
-    semantic_contract:
-      expected_equivalence: marker_rank_and_pvalue_close_on_supported_path
-      supported_when:
-        - method == "wilcoxon"
-        - reference == "rest"
-        - tie_correct behavior is supported
-        - use_raw/layer state is sparse and supported
-      fallback_when:
-        - method is not wilcoxon
-        - reference is not rest
-        - tie_correct path is unsupported
-        - dense fallback path is required
-      known_differences:
-        - removed legacy class-method patches because they set stale scanpy internal result attributes
-      speed_effect_if_gates_are_fixed: may_change_if_tie_correct_or_dense_paths_are_added
-    changes:
-      - id: scanpy-rank-genes-groups-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry for rank_genes_groups fast path.
-        correctness_effect: documents narrow Wilcoxon contract
-        speed_effect: none
-        verification_required:
-          - sparse wilcoxon rest parity
-          - tie_correct behavior
-          - reference != rest fallback
-          - dense fallback
+    contract: gated Wilcoxon marker path
 
+utilities:
   autozyme.scanpy.zyme_prepare:
     status: active
-    release_risk: low
-    support_policy: explicit_utility_not_monkey_patch
-    semantic_contract:
-      expected_equivalence: not_applicable_new_api
-      supported_when:
-        - user explicitly imports and calls utility
-      fallback_when: []
-      known_differences:
-        - this is a new helper, not a replacement for upstream scanpy
-      speed_effect_if_gates_are_fixed: no_benchmark_claim_without_explicit_measurement
-    changes:
-      - id: scanpy-zyme-prepare-initial-ledger-2026-05-24
-        type: docs_only
-        status: recorded
-        summary: Initial ledger entry for explicit preparation helper.
-        correctness_effect: documents non-patch status
-        speed_effect: none
-        verification_required:
-          - dtype/layout conversion test
-          - no unintended mutation beyond documented conversions
+    contract: explicit helper, not a monkey patch
 
-retired_methods:
+retired_targets:
   scanpy.preprocessing.regress_out:
-    retired_on: 2026-05-24
-    reason: not_in_current_scanpy_attest_manifest_and_no_package_speedups_snapshot
-    files_retained_for_provenance:
-      - src/autozyme/scanpy/_regress_out.py
-    shipped_registration: removed
-    speed_claim_status: none
-    reinstatement_required:
-      - add current task under optimized_task/test_seurat_scanpy/
-      - add entry to scripts/scanpy_attest_manifest.yaml
-      - run zyme attest and publish scanpy_regress_out.tsv
-      - add activation and parity regression tests
+    status: retired
+    reason: not registered by the Scanpy aggregate patch

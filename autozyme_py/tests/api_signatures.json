@@ -1,6 +1,6 @@
 {
   "activate": "(name) -> 'bool | dict[str, bool]'",
-  "auto_threads": "(cap: 'int | None' = None) -> 'int'",
+  "auto_threads": "(cap: 'int | None' = None, default: 'int | None' = 4) -> 'int'",
   "benchmark": "(name: 'str', task_dir: 'str', tier: 'str' = 'tiny', reps: 'int' = 3, verbose: 'bool' = True) -> 'dict[str, Any]'",
   "deactivate": "(name) -> 'None'",
   "deactivate_all": "() -> 'None'",
@@ -10,7 +10,7 @@
   "is_disabled": "() -> 'bool'",
   "list_patches": "(installed: 'bool' = False) -> 'list[str]'",
   "list_subsets": "() -> 'list[str]'",
-  "register_patch": "(name: 'str', targets: 'list[tuple[str, str, Callable]]', smoke: 'dict[str, Callable] | None' = None, tested_against: 'str | None' = None, tested_upstream_versions: 'dict[str, list[str]] | None' = None, strict_upstream_versions: 'bool' = False) -> 'None'",
+  "register_patch": "(name: 'str', targets: 'list[tuple[str, str, Callable]]', smoke: 'dict[str, Callable] | None' = None, tested_against: 'str | None' = None, tested_upstream_versions: 'dict[str, list[str]] | None' = None, strict_upstream_versions: 'bool' = False, runtime_deps: 'list[str] | None' = None) -> 'None'",
   "resolve_dataset_path": "(task_dir: 'str', raw_path: 'str') -> 'str'",
   "restore": "(name) -> 'None'",
   "restore_all": "() -> 'None'",

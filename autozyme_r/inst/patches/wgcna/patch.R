@@ -49,11 +49,21 @@
 #
 # No data.table dependency. The fast TOM math is pure R + matrixStats + Rcpp.
 
+# Tell WGCNA users what to install when the accelerator's extra dependency is
+# absent: the registration gate below would otherwise decline silently and they
+# would see no speedup and no reason why. (irlba is a CRAN package WGCNA itself
+# does not pull in; yaml is needed only by the attest harness, not here.)
+if (requireNamespace("WGCNA", quietly = TRUE) &&
+    !requireNamespace("irlba", quietly = TRUE)) {
+  message("[autozyme] WGCNA accelerator inactive: ",
+          "install.packages(\"irlba\") to enable the truncated-SVD ",
+          "moduleEigengenes speedup; WGCNA runs unaccelerated meanwhile.")
+}
+
 if (requireNamespace("WGCNA",        quietly = TRUE) &&
     requireNamespace("matrixStats",  quietly = TRUE) &&
     requireNamespace("irlba",        quietly = TRUE) &&
-    requireNamespace("parallel",     quietly = TRUE) &&
-    requireNamespace("yaml",         quietly = TRUE)) {
+    requireNamespace("parallel",     quietly = TRUE)) {
 
   # ---------------------------------------------------------------------------
   # Originals captured at file scope (convention #3).

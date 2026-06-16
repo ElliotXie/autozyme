@@ -18,6 +18,16 @@ The active prompt set for single-cell / bioinformatics targets. `zyme init` read
 1_init  →  2_iterate  →  [2.5_iterate_memory]  →  3_validate_scaling  →  [3.5_portability]  →  4_package  →  zyme bench  →  5_reflect
 ```
 
+## Situational prompts ([situational/](situational/))
+
+Prompts that fire only for specific workflows, not the main 0-5 loop. `zyme init` copies them into the task tucked under `prompts/situational/` so they don't clutter the top level.
+
+| Prompt | When |
+|---|---|
+| [situational/6.1_transfer_init.md](situational/6.1_transfer_init.md) | Starting a new task that inherits a converged **sibling** task's pipeline (shared upstream package + call chain). Replaces `1_init.md`. |
+| [situational/6.2_iterate.md](situational/6.2_iterate.md) | Iterate variant paired with 6.1 (reads `transfer_knowledge.md`; commits the inherited pipeline as round-1). Use instead of `2_iterate.md` only when 6.1 set the task up. |
+| [situational/M_thread_baseline_fairness.md](situational/M_thread_baseline_fairness.md) | One-shot audit for the unfair-baseline bug (parallel `pipeline/run` vs single-threaded `reference`). Phase 3 references it for the decision framing + retrofit templates. |
+
 ## Design lineage
 
 These prompts encode lessons from autozyme runs against Seurat / Scanpy / celda / DoubletFinder / cellchat targets. Updates land here. See `../../../PROMPT_PHILOSOPHY.md` for editing rules.

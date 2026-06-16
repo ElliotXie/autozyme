@@ -17,8 +17,7 @@ if (requireNamespace("tradeSeq",             quietly = TRUE) &&
     requireNamespace("BiocParallel",         quietly = TRUE) &&
     requireNamespace("S4Vectors",            quietly = TRUE) &&
     requireNamespace("SummarizedExperiment", quietly = TRUE) &&
-    requireNamespace("pbapply",              quietly = TRUE) &&
-    requireNamespace("yaml",                 quietly = TRUE)) {
+    requireNamespace("pbapply",              quietly = TRUE)) {
 
   orig_fitGAM_internal <- utils::getFromNamespace(".fitGAM",      "tradeSeq")
   .checks              <- utils::getFromNamespace(".checks",      "tradeSeq")

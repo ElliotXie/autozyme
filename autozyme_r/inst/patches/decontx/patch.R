@@ -29,8 +29,7 @@ if (requireNamespace("celda",         quietly = TRUE) &&
     requireNamespace("scater",        quietly = TRUE) &&
     requireNamespace("SingleCellExperiment", quietly = TRUE) &&
     requireNamespace("withr",         quietly = TRUE) &&
-    requireNamespace("dbscan",        quietly = TRUE) &&
-    requireNamespace("yaml",          quietly = TRUE)) {
+    requireNamespace("dbscan",        quietly = TRUE)) {
 
   # File-scope captures.
   .decontx_orig_decontX        <- utils::getFromNamespace("decontX",            "celda")

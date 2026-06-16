@@ -5,7 +5,9 @@ Fast paths registered through ``register_patch``:
   ``sc.pp.normalize_total`` + ``sc.pp.log1p`` (parallel numba CSR kernels)
   ``sc.pp.scale``                            (fused numba kernel)
   ``sc.pp.highly_variable_genes``            (single-pass numba kernels for seurat / seurat_v3 batch)
+  ``sc.pp.neighbors``                        (scBLAS kNN + UMAP graph-prep)
   ``sc.tl.pca``                              (Gram-matrix BLAS + partial LAPACK)
+  ``sc.tl.umap``                             (scBLAS deterministic layout optimizer)
   ``sc.tl.leiden``                           (simple-graph igraph C, Unix fork)
   ``sc.tl.rank_genes_groups``                (fused CSC kernels for wilcoxon)
 
@@ -27,11 +29,31 @@ Bonus utility (not a replacement — a new attr):
 """
 from __future__ import annotations
 
+import os
+
 from autozyme._core import register_patch
+
+
+def _set_safe_numba_threading_layer() -> None:
+    """Avoid macOS crashes from duplicate OpenMP runtimes in Scanpy's UMAP path.
+
+    umap-learn 0.5.9 imports its optional parametric module from package import,
+    which imports torch when installed. In mixed conda/pip environments this can
+    load both sklearn's and torch's libomp.dylib into the same process. Scanpy's
+    default neighbors path then initializes numba on the OpenMP layer and can
+    segfault before Python can raise an exception. Numba's workqueue backend
+    avoids that OpenMP runtime entirely.
+    """
+    os.environ.setdefault("NUMBA_THREADING_LAYER", "workqueue")
+
+
+_set_safe_numba_threading_layer()
 
 from ._normalize import fast_normalize_total, fast_log1p
 from ._scale import fast_scale
 from ._pca import fast_pca
+from ._neighbors import fast_neighbors
+from ._umap import fast_umap
 from ._highly_variable import _patched_hvg
 from ._leiden import fast_leiden
 from ._rank_genes import _fast_rank_genes_groups
@@ -149,12 +171,14 @@ register_patch(
         # regress_out temporarily disabled:
         # ("scanpy.preprocessing", "regress_out",            fast_regress_out),
         ("scanpy.preprocessing", "highly_variable_genes",  _patched_hvg),
+        ("scanpy.preprocessing", "neighbors",              fast_neighbors),
         ("scanpy.tools",         "pca",                    fast_pca),
         # sc.pp.pca is the modern canonical PCA call; sc.tl.pca is its
         # deprecated alias. They are distinct name bindings, so patching
         # tools.pca alone left sc.pp.pca (the common path) on the slow original.
         # Same fast_pca, just the other public alias.
         ("scanpy.preprocessing", "pca",                    fast_pca),
+        ("scanpy.tools",         "umap",                   fast_umap),
         ("scanpy.tools",         "leiden",                 fast_leiden),
         ("scanpy.tools",         "rank_genes_groups",      _fast_rank_genes_groups),
 
@@ -163,6 +187,8 @@ register_patch(
         # ("scanpy.preprocessing._simple",                 "regress_out",          fast_regress_out),
         ("scanpy.preprocessing._highly_variable_genes", "highly_variable_genes", _patched_hvg),
         ("scanpy.preprocessing._pca",                    "pca",                   fast_pca),
+        ("scanpy.neighbors",                            "neighbors",             fast_neighbors),
+        ("scanpy.tools._umap",                           "umap",                  fast_umap),
         ("scanpy.tools._leiden",                         "leiden",               fast_leiden),
 
         # _RankGenes class-method patches: scanpy-turbo had three patches

@@ -23,8 +23,7 @@ if (requireNamespace("scriabin",    quietly = TRUE) &&
     requireNamespace("Seurat",      quietly = TRUE) &&
     requireNamespace("SeuratObject",quietly = TRUE) &&
     requireNamespace("Matrix",      quietly = TRUE) &&
-    requireNamespace("methods",     quietly = TRUE) &&
-    requireNamespace("yaml",        quietly = TRUE)) {
+    requireNamespace("methods",     quietly = TRUE)) {
 
   # ============================================================
   # File-scope captures

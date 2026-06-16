@@ -31,7 +31,7 @@ def set_threads(n: int) -> int:
     return n
 
 
-def auto_threads(cap: int | None = None) -> int:
+def auto_threads(cap: int | None = None, default: int | None = 4) -> int:
     """Pick a sensible thread count for a patch.
 
     Resolves a worker count using this priority order:
@@ -39,36 +39,48 @@ def auto_threads(cap: int | None = None) -> int:
          ``ZYME_THREADS`` (primary) > ``AUTOZYME_THREADS`` >
          ``OMP_NUM_THREADS`` > ``AUTOZYMER_THREADS`` (legacy last-resort
          spelling). An explicit env override wins over everything,
-         including ``cap``.
+         including ``cap`` and ``default``.
       2. The module-level option set by ``set_threads()`` (also wins over
-         ``cap``).
-      3. Hardware default: ``os.cpu_count() - 1``, bounded above by ``cap``
-         (if given) and a hard ceiling of 16 to prevent runaway
-         oversubscription on big machines.
+         ``cap`` and ``default``).
+      3. ``default`` threads, bounded above by the machine's core count, by
+         ``cap`` (if given), and by a hard ceiling of 16.
+
+    ``default`` is **4** -- the count the finalized speedup sweeps showed is
+    the best single conservative default: it captures the large 1->4 jump
+    (~1.9x median wall-clock) while staying clear of the oversubscription
+    cliff that makes >4 threads *slower* on small inputs for many patches.
+    Pass ``default=None`` to opt a patch into hardware scaling
+    (``os.cpu_count() - 1``, still capped at 16) -- reserve that for the few
+    patches whose finalized data keeps improving past 4 threads (e.g. scvelo,
+    nichenetr).
 
     Designed for use inside lifted patches as a drop-in replacement for
     hardcoded thread counts (``mc.cores=12`` ->
-    ``mc.cores=auto_threads(cap=12)``). ``cap`` should be the patch's max
-    sensible worker count -- typically what the lift-time
-    ``pipeline/run.py`` used. Tier-aware patches pass ``cap`` from a
-    per-tier dict.
+    ``mc.cores=auto_threads(cap=12)``). ``cap`` is the patch's max sensible
+    worker count -- a ceiling layered on top of ``default``. With the default
+    base of 4, ``cap`` only bites for caps < 4 (or together with
+    ``default=None``).
 
     Args:
-        cap: Optional integer upper bound. Caps the hardware default; does
-            NOT cap the env-var or option override (those represent
-            explicit user intent and win even when above ``cap``, e.g. for
-            CI thread sweeps).
+        cap: Optional integer upper bound on the resolved count. Does NOT cap
+            the env-var or option override (those represent explicit user
+            intent and win even when above ``cap``, e.g. for CI thread
+            sweeps).
+        default: Base thread count when no env/option override is present.
+            Defaults to 4. ``None`` means "scale to hardware"
+            (``os.cpu_count() - 1``).
 
     Returns:
         Positive integer thread count, always >= 1.
 
     Examples:
-        >>> auto_threads()                        # hardware default
-        >>> auto_threads(cap=8)                   # cap at 8
-        >>> os.environ["ZYME_THREADS"] = "4"
-        >>> auto_threads(cap=8)                   # 4 (env wins)
+        >>> auto_threads()                        # 4 (bounded by core count)
+        >>> auto_threads(cap=2)                   # 2
+        >>> auto_threads(default=None)            # os.cpu_count() - 1, max 16
+        >>> os.environ["ZYME_THREADS"] = "8"
+        >>> auto_threads()                        # 8 (env wins)
     """
-    # 1. Thread budget from env -- wins over cap. Honor any of the env
+    # 1. Thread budget from env -- wins over cap/default. Honor any of the env
     # vars the attest harness propagates (ZYME_THREADS is the primary;
     # AUTOZYME_THREADS / OMP_NUM_THREADS are mirrors). The legacy spelling
     # AUTOZYMER_THREADS (with a stray R) is kept as a last resort so
@@ -84,7 +96,7 @@ def auto_threads(cap: int | None = None) -> int:
             except ValueError:
                 pass
 
-    # 2. Module-level option (set by set_threads) -- also wins over cap
+    # 2. Module-level option (set by set_threads) -- also wins over cap/default
     if _AUTOZYME_THREADS_OPTION is not None:
         try:
             n = int(_AUTOZYME_THREADS_OPTION)
@@ -93,9 +105,28 @@ def auto_threads(cap: int | None = None) -> int:
         except (TypeError, ValueError):
             pass
 
-    # 3. Hardware default, bounded by cap and 16-thread ceiling
+    # 3. Base target, bounded by hardware, cap, and the 16-thread ceiling.
     cores = os.cpu_count() or 1
-    default = max(1, cores - 1)
+    if default is None:
+        # "Scale to hardware" -- for patches whose finalized sweeps keep
+        # speeding up past 4 threads. Leave one core for the OS.
+        base = max(1, cores - 1)
+    else:
+        # An explicit default that can't be made a positive int is a
+        # programming error, not a soft hint (mirrors the cap contract).
+        try:
+            base = int(default)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"auto_threads default must be int or None, got {default!r} "
+                f"({type(default).__name__})"
+            )
+        if base < 1:
+            raise ValueError(
+                f"auto_threads default must be >= 1, got {base}"
+            )
+        # Never hand out more workers than the machine has cores.
+        base = min(base, cores)
 
     if cap is not None:
         # Match `set_threads`: an explicit cap that can't be made a positive
@@ -113,10 +144,10 @@ def auto_threads(cap: int | None = None) -> int:
             raise ValueError(
                 f"auto_threads cap must be >= 1, got {cap_int}"
             )
-        default = min(default, cap_int)
+        base = min(base, cap_int)
 
-    default = min(default, 16)
-    return max(1, default)
+    base = min(base, 16)
+    return max(1, base)
 
 
 def safe_set_num_threads(n: int) -> int:

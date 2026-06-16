@@ -369,4 +369,7 @@ register_patch(
     smoke={"load": _smoke_load, "call": _smoke_call, "save": _smoke_save},
     tested_against="lifelines 0.30.3",
     tested_upstream_versions={"lifelines": ["0.30.3"]},
+    # numba is imported unconditionally for the @njit Cox kernel but is NOT a
+    # lifelines dependency; probe for it so a numba-less env skips gracefully.
+    runtime_deps=["numba"],
 )

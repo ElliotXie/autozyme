@@ -20,6 +20,10 @@ These prompts are **a near-copy of `../Bio/`**, with biology-specific role frami
 1_init  →  2_iterate  →  [2.5_iterate_memory]  →  3_expand_scaling  →  [3.5_portability]  →  4_package  →  zyme bench  →  5_reflect
 ```
 
+## Situational prompts ([situational/](situational/))
+
+Prompts that fire only for specific workflows, not the main 0-5 loop; `zyme init` copies them under `prompts/situational/`. This set has [situational/6.1_transfer_init.md](situational/6.1_transfer_init.md) (sibling-inherited init), [situational/6.2_iterate.md](situational/6.2_iterate.md) (its paired iterate variant), and [situational/M_thread_baseline_fairness.md](situational/M_thread_baseline_fairness.md) (one-shot thread-baseline fairness audit, referenced by phase 3). See `../Bio/README.md` for the full descriptions.
+
 ## Drift policy
 
 `Bio/` is the reference. When `Bio/` gets a structural update (new tag, new helper, new flow), copy the change here too — but skip the biology-specific examples / role framing. If the two diverge structurally beyond a few role lines, that's a signal to refactor: extract the shared body into a single source and keep this dir small.

@@ -12,7 +12,7 @@ You add two new datasets, run a fast pass, then a stability gate. If everything 
 
 ## Phases
 
-- **0. Fairness pre-flight** (no rounds): confirm dev-tier baselines are fair against the threading matrix this phase will sweep. **Hard stop** + redirect to `M_thread_baseline_fairness.md` if not.
+- **0. Fairness pre-flight** (no rounds): confirm dev-tier baselines are fair against the threading matrix this phase will sweep. **Hard stop** + redirect to `situational/M_thread_baseline_fairness.md` if not.
 - **Setup** (no rounds): pick + add 2 OOD datasets to `task.yaml`, record their upstream baselines per-thread.
 - **Phase A** — fast pass (no rounds): converged stack at ood_xlarge + ood_large; threading 1-rep matrix at medium + large; thread=1/4/8 regime check at ood_xlarge.
 - **Fix loop** — only on failure. Each hypothesis cites the failure.
@@ -25,7 +25,7 @@ Happy path: zero rounds, ~3 hours wall.
 
 Before adding OOD tiers, confirm dev-tier baselines are fair against the threading matrix this phase will sweep. A.2 / A.3 / Phase B compare `optimized@N` against `baseline@N` per cell — if the `(tier, N)` baseline row doesn't exist (or `reference.{R,py}` doesn't honor `ZYME_THREADS`, so all threads measure the same number), the cell falls back to a flat baseline and the resulting `speedup_pct` mixes algorithmic gains with raw parallelism. Speedup numbers from such a state are dishonest by roughly a factor of N.
 
-This is a known historical bug class. The CLI side has shipped the fix (per-`(tier, thread)` baseline rows in `results.tsv`, `task.yaml::baseline_threads`, `zyme baseline reference --thread N`, `zyme baseline rebench`). Tasks initialized before that fix still need a one-shot retrofit; this pre-flight is the catch — done **inline** here, since `M_thread_baseline_fairness.md` is designed for retroactive audit (it expects an existing Phase-3 `verify.tsv` to patch in place) and isn't usable as a precondition.
+This is a known historical bug class. The CLI side has shipped the fix (per-`(tier, thread)` baseline rows in `results.tsv`, `task.yaml::baseline_threads`, `zyme baseline reference --thread N`, `zyme baseline rebench`). Tasks initialized before that fix still need a one-shot retrofit; this pre-flight is the catch — done **inline** here, since `situational/M_thread_baseline_fairness.md` is designed for retroactive audit (it expects an existing Phase-3 `verify.tsv` to patch in place) and isn't usable as a precondition.
 
 **Three checks, fail-fast:**
 
@@ -39,12 +39,12 @@ This is a known historical bug class. The CLI side has shipped the fix (per-`(ti
 
    **3a — Legacy state**: `baseline_threads == [1]` (or narrower than `{1, 4, 8}` — the set A.2/A.3 will sweep) **AND** step 1 found threading constructs. Inline retrofit, in this order:
 
-   1. **Decide A vs B by reading upstream source** under `upstream_repo/` (clone if missing). For `task.yaml::target_function`: does it expose a built-in parallelism knob — an argument or env var an upstream user could engage *without modifying the function*? R: `parallel=TRUE` + `BPPARAM=MulticoreParam(N)`, `mc.cores=`, `nthreads=`. Python: `n_jobs=`, `num_workers=`, env vars actually consumed by the function. (See `M_thread_baseline_fairness.md`'s "## The decision" for the framing — same diagnosis, applied here ahead of scaling instead of after.)
+   1. **Decide A vs B by reading upstream source** under `upstream_repo/` (clone if missing). For `task.yaml::target_function`: does it expose a built-in parallelism knob — an argument or env var an upstream user could engage *without modifying the function*? R: `parallel=TRUE` + `BPPARAM=MulticoreParam(N)`, `mc.cores=`, `nthreads=`. Python: `n_jobs=`, `num_workers=`, env vars actually consumed by the function. (See `situational/M_thread_baseline_fairness.md`'s "## The decision" for the framing — same diagnosis, applied here ahead of scaling instead of after.)
 
       - **Outcome A — knob exists**: reference can be wired to the upstream parallel path. Real per-thread baselines will reflect upstream's actual scaling. Proceed with steps 2A → 3 → 4A → 5.
       - **Outcome B — no knob**: pipeline added a parallel layer upstream genuinely couldn't have. The reference will stay serial; the comparison is honest as "algorithmic + new parallel layer the user couldn't have without us." But — and this is the load-bearing piece — A.2/A.3 still need a baseline row at every `(tier, thread)` cell or they'd HARD FAIL with `speedup_pct=0` for thread>1 cells. Solution: record `baseline_threads=[1,4,8]` and **replicate** the thread=1 baseline value across thread=4/8 (no point re-running a serial reference at higher thread caps; the wall is constant modulo cold-cache noise). Proceed with steps 2B → 3 → 4B → 5; SUMMARY will use the parallel-dominant disclosure form.
 
-   2A. **(Outcome A)** **Edit `reference.{R,py}`** to read `ZYME_THREADS` and branch — serial path when `N == 1` (must stay byte-identical to current behavior; deterministic tasks will catch drift via evaluate), upstream parallel knob with `N` workers when `N > 1`. The parallel branch must engage the **upstream knob** found in step 1; if the only way to parallelize is wrapping upstream in your own pool, you're actually in Outcome B — back up. Don't change anything outside the timed window. See `M_thread_baseline_fairness.md → ## Retrofit → Step 1` for R/Python templates and hard rules.
+   2A. **(Outcome A)** **Edit `reference.{R,py}`** to read `ZYME_THREADS` and branch — serial path when `N == 1` (must stay byte-identical to current behavior; deterministic tasks will catch drift via evaluate), upstream parallel knob with `N` workers when `N > 1`. The parallel branch must engage the **upstream knob** found in step 1; if the only way to parallelize is wrapping upstream in your own pool, you're actually in Outcome B — back up. Don't change anything outside the timed window. See `situational/M_thread_baseline_fairness.md → ## Retrofit → Step 1` for R/Python templates and hard rules.
 
    2B. **(Outcome B)** Don't edit `reference.{R,py}`. It stays serial; that's the truthful state. (`zyme baseline reference --thread N` will set `OMP_NUM_THREADS=N` etc. but the upstream code won't actually parallelize, so the wall stays constant — which is exactly what `--replicated` codifies in step 4B.)
 

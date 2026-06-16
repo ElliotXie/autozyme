@@ -20,8 +20,7 @@ if (requireNamespace("infercnv",       quietly = TRUE) &&
     requireNamespace("matrixStats",    quietly = TRUE) &&
     requireNamespace("futile.logger",  quietly = TRUE) &&
     requireNamespace("rjags",          quietly = TRUE) &&
-    requireNamespace("methods",        quietly = TRUE) &&
-    requireNamespace("yaml",           quietly = TRUE)) {
+    requireNamespace("methods",        quietly = TRUE)) {
 
   # ============================================================
   # File-scope captures of upstream internals

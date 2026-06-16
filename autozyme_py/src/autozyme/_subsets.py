@@ -43,27 +43,27 @@ SUBSETS: dict[str, list[str]] = {
 #
 # Keep in sync with each patch's `register_patch(targets=...)`. New patches
 # packaged via 4_package.md must add their entry here.
+# AUTOZYME-GENERATED-UPSTREAMS-BEGIN
 UPSTREAMS: dict[str, list[str]] = {
-    "cell2location": ["cell2location", "pyro"],
-    "sccoda":        ["sccoda", "tensorflow", "tensorflow_probability", "tf_keras"],
-    "xclim":         ["xclim"],
-    "obspy":         ["obspy"],
-    "prody":         ["prody"],
-    "scvelo":        ["scvelo"],
-    "lifelines":     ["lifelines"],
-    "mdanalysis_rmsd": ["MDAnalysis"],
-    "statsmodels":   ["statsmodels"],
-    "dipy":          ["dipy"],
-    "fipy":          ["fipy"],
-    "sarsen":        ["sarsen", "xarray_sentinel"],
-    "scanpy":        ["scanpy"],
-    "cellphonedb":   ["cellphonedb"],
-    "squidpy_cooccurrence": ["squidpy"],
+    "_test_json": ["json"],
     "astropy_boxleastsquares": ["astropy"],
-    # Test-only synthetic patch (see autozyme/_test_json/__init__.py).
-    # Underscore prefix excludes it from _AVAILABLE / list_patches().
-    "_test_json":    ["json"],
+    "cell2location": ["cell2location", "pyro"],
+    "cellphonedb": ["cellphonedb"],
+    "dipy": ["dipy"],
+    "fipy": ["fipy"],
+    "lifelines": ["lifelines", "numba"],
+    "mdanalysis_rmsd": ["MDAnalysis"],
+    "obspy": ["obspy"],
+    "prody": ["prody"],
+    "sarsen": ["sarsen", "xarray_sentinel"],
+    "scanpy": ["scanpy"],
+    "sccoda": ["sccoda", "tensorflow_probability"],
+    "scvelo": ["scvelo"],
+    "squidpy_cooccurrence": ["squidpy"],
+    "statsmodels": ["statsmodels"],
+    "xclim": ["xclim"],
 }
+# AUTOZYME-GENERATED-UPSTREAMS-END
 
 # Pairs of patches known to interact badly when activated in the same process.
 # `activate()` consults this and warns (does not raise) when a user lights up

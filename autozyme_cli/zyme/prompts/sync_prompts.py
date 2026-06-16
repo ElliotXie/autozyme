@@ -253,7 +253,11 @@ def collect_per_file(field: str) -> dict[str, list[tuple[int, str, str, str]]]:
     field_dir = PROMPTS_ROOT / field
     if not field_dir.exists():
         return out
-    for md in sorted(field_dir.glob("*.md")):
+    # Top-level phase prompts plus the `situational/` subdir (transfer-init,
+    # thread-fairness audit). Keyed by basename, which stays unique across the
+    # two levels.
+    mds = list(field_dir.glob("*.md")) + list((field_dir / "situational").glob("*.md"))
+    for md in sorted(mds):
         out[md.name] = extract_invocations(md)
     return out
 

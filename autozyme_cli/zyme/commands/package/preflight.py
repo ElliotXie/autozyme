@@ -68,13 +68,16 @@ def _step_portability(task_dir: Path, framework_root: Path | None) -> int:
     return 0
 
 
-def _step_smoke_parity(task_dir: Path, patch_name: str | None) -> int:
-    print("\n=== preflight: smoke-parity (tiny) ===")
+def _step_smoke_parity(task_dir: Path, patch_name: str | None,
+                       lang: str | None = None) -> int:
+    from zyme.parsers.task_yaml import resolve_smoke_tier
+    tier = resolve_smoke_tier(task_dir / "task.yaml")
+    print(f"\n=== preflight: smoke-parity ({tier}) ===")
     args = SimpleNamespace(
         task_dir=str(task_dir),
         patch=patch_name,
-        tier="tiny",
-        lang=None,
+        tier=tier,
+        lang=lang,
     )
     return cmd_package_smoke_parity(args)
 
@@ -100,7 +103,7 @@ def cmd_package_preflight(args) -> int:
 
     if not skip_parity:
         patch_name = _infer_patch_name(task_dir)
-        rc = _step_smoke_parity(task_dir, patch_name)
+        rc = _step_smoke_parity(task_dir, patch_name, getattr(args, "lang", None))
         if rc != 0:
             failures.append("smoke-parity")
             if not cont:

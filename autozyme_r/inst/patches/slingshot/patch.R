@@ -16,8 +16,7 @@ if (requireNamespace("slingshot",            quietly = TRUE) &&
     requireNamespace("TrajectoryUtils",      quietly = TRUE) &&
     requireNamespace("princurve",            quietly = TRUE) &&
     requireNamespace("matrixStats",          quietly = TRUE) &&
-    requireNamespace("methods",              quietly = TRUE) &&
-    requireNamespace("yaml",                 quietly = TRUE)) {
+    requireNamespace("methods",              quietly = TRUE)) {
 
   # Pre-resolve hot lookups once to avoid namespace lookup per iter.
   .slingshot_proj_to_curve <- princurve::project_to_curve

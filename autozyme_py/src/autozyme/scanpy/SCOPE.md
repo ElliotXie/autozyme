@@ -34,13 +34,6 @@ _Auto-generated from `scripts/patch_scope.tsv`. Do not edit by hand — run
 - **Supported scope:** Fast path handles the standard single-cell tutorial pair on sparse data: X that is sparse-convertible (converted to CSR float32 with int32 indices when nnz <= 2^31-1), inplace=True, copy in {True, False}, and no extra keyword args. Both target_sum modes are implemented: explicit target_sum (e.g. 1e4) routes to the fused per-row sum+scale kernel _fused_normalize_only; target_sum=None routes to _row_sums + a median-based target then _scale_only. log1p applies a parallel numba np.log1p over CSR .data (natural log, base=None), and falls back to np.log1p(out) for dense X. Numeric output of the .X matrix matches upstream on the benchmarked default-dtype CSR counts path (this is what the concordance metric checks).
 - **Out-of-scope behavior:** Out-of-scope parameters **fall back to the upstream implementation** (correct result, no speedup).
 
-## `scanpy.pp.regress_out`
-
-- **In-scope output equivalence:** tolerance
-- **Validated at:** `sc.pp.regress_out(<data>, ['total_counts', 'pct_counts_mt'], n_jobs=1)  — data = log-normalized sparse CSR AnnData (pbmc68k_prepped.h5ad, small tier); layer=None, copy=False (both upstream defaults). task.yaml signature line: sc.pp.regress_out(adata, ['total_counts', 'pct_counts_mt'], n_jobs=1)`
-- **Supported scope:** Fast path is correct for non-categorical, numeric (ordinal) regressor keys with a non-empty keys list. It correctly handles: (a) sparse CSR/CSBase X via a sparse-aware regressors.T@X GEMM computed before densification (lines 154-158) — this is the benchmarked path; (b) rank-deficient / singular gram (e.g. an all-zero pct_counts_mt covariate) via np.linalg.pinv closed-form OLS, bypassing upstream's per-gene statsmodels GLM fallback (lines 137-145); (c) the layer= argument (reads/writes via _get_obs_rep/_set_obs_rep, lines 95/176) and copy= (line 88). It matches upstream's target_dtype rule for integer/float32/float64 X (lines 110-116). For the DENSE + non-singular case it intentionally defers to the unmodified upstream original (lines 137-143), so it is never wrong there. Math is OLS-equivalent (pearson per gene 1.000000, q99_abs_diff_X <= 1.2e-5 per docstring; task thresholds pearson>=0.9999, q99<=0.001, max<=0.01).
-- **Out-of-scope behavior:** Out-of-scope parameters **fall back to the upstream implementation** (correct result, no speedup).
-
 ## `scanpy.pp.scale`
 
 - **In-scope output equivalence:** bit_exact

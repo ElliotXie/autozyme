@@ -29,6 +29,18 @@ fast_decontXEM_cpp <- function(counts, counts_colsums, theta, estimate_eta, eta,
     .Call(`_autozyme_fast_decontXEM_cpp`, counts, counts_colsums, theta, estimate_eta, eta, phi, z, estimate_delta, delta, pseudocount, n_threads_request)
 }
 
+fitDisp_zyme <- function(ySEXP, xSEXP, mu_hatSEXP, log_alphaSEXP, log_alpha_prior_meanSEXP, log_alpha_prior_sigmasqSEXP, min_log_alphaSEXP, kappa_0SEXP, tolSEXP, maxitSEXP, usePriorSEXP, weightsSEXP, useWeightsSEXP, weightThresholdSEXP, useCRSEXP) {
+    .Call(`_autozyme_fitDisp_zyme`, ySEXP, xSEXP, mu_hatSEXP, log_alphaSEXP, log_alpha_prior_meanSEXP, log_alpha_prior_sigmasqSEXP, min_log_alphaSEXP, kappa_0SEXP, tolSEXP, maxitSEXP, usePriorSEXP, weightsSEXP, useWeightsSEXP, weightThresholdSEXP, useCRSEXP)
+}
+
+row_trimmed_means <- function(m, cols0, trim) {
+    .Call(`_autozyme_row_trimmed_means`, m, cols0, trim)
+}
+
+fitBeta_zyme <- function(ySEXP, xSEXP, nfSEXP, alpha_hatSEXP, contrastSEXP, beta_matSEXP, lambdaSEXP, weightsSEXP, useWeightsSEXP, tolSEXP, maxitSEXP, useQRSEXP, minmuSEXP) {
+    .Call(`_autozyme_fitBeta_zyme`, ySEXP, xSEXP, nfSEXP, alpha_hatSEXP, contrastSEXP, beta_matSEXP, lambdaSEXP, weightsSEXP, useWeightsSEXP, tolSEXP, maxitSEXP, useQRSEXP, minmuSEXP)
+}
+
 calcEsLeBatchCpp <- function(stats, selectedGenes, scoreType) {
     .Call(`_autozyme_calcEsLeBatchCpp`, stats, selectedGenes, scoreType)
 }
@@ -111,6 +123,14 @@ fast_viterbi_adj_cpp <- function(x, Pi, delta, means, sds) {
 
 zyme_fill_dcast <- function(row_codes, col_codes, counts, n_rows, n_cols) {
     .Call(`_autozyme_zyme_fill_dcast`, row_codes, col_codes, counts, n_rows, n_cols)
+}
+
+fast_milor_pdist_one <- function(in_x, row_names) {
+    .Call(`_autozyme_fast_milor_pdist_one`, in_x, row_names)
+}
+
+fast_milor_pdist_batch <- function(rd_mat, non_zero, nh_n, cell_names, n_threads) {
+    .Call(`_autozyme_fast_milor_pdist_batch`, rd_mat, non_zero, nh_n, cell_names, n_threads)
 }
 
 az_blas_gemm <- function(A, B, transA = FALSE, transB = FALSE, threads = 0L, dll_paths = character()) {
@@ -209,8 +229,20 @@ turbo_annoy_build_search <- function(data, k, n_trees, n_threads) {
     .Call(`_autozyme_turbo_annoy_build_search`, data, k, n_trees, n_threads)
 }
 
+seurat_exact_knn_f32 <- function(data, k, n_threads) {
+    .Call(`_autozyme_seurat_exact_knn_f32`, data, k, n_threads)
+}
+
 seurat_log_normalize_dgc <- function(mat, scale_factor, grain_size = 100L) {
     invisible(.Call(`_autozyme_seurat_log_normalize_dgc`, mat, scale_factor, grain_size))
+}
+
+az_runumap_knn_cpp <- function(X, k, n_trees, n_iters, leaf_size, seed, n_threads) {
+    .Call(`_autozyme_az_runumap_knn_cpp`, X, k, n_trees, n_iters, leaf_size, seed, n_threads)
+}
+
+az_runumap_layout_cpp <- function(init, head, tail, epochs_per_sample, n_epochs, a, b, gamma, initial_alpha, negative_sample_rate, seed, n_threads) {
+    .Call(`_autozyme_az_runumap_layout_cpp`, init, head, tail, epochs_per_sample, n_epochs, a, b, gamma, initial_alpha, negative_sample_rate, seed, n_threads)
 }
 
 turbo_scale_sparse_full <- function(sparse_mat, gene_indices, scale_max) {
@@ -276,4 +308,3 @@ nb_ls_cpp <- function(y, w, theta_log, scale) {
 accelerate_crossprod <- function(X) {
     .Call(`_autozyme_accelerate_crossprod`, X)
 }
-

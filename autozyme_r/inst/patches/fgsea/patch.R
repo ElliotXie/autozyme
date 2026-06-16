@@ -44,8 +44,7 @@
 if (requireNamespace("fgsea",        quietly = TRUE) &&
     requireNamespace("BiocParallel", quietly = TRUE) &&
     requireNamespace("data.table",   quietly = TRUE) &&
-    requireNamespace("fastmatch",    quietly = TRUE) &&
-    requireNamespace("yaml",         quietly = TRUE)) {
+    requireNamespace("fastmatch",    quietly = TRUE)) {
 
   # ---------------------------------------------------------------------------
   # Originals + internal helpers captured at file scope (convention #3).

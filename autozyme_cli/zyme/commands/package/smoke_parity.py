@@ -36,7 +36,7 @@ from zyme.commands.package.check_intercept import (
     _spawn_python_worker,
     _spawn_r_worker,
 )
-from zyme.parsers.task_yaml import parse_metrics
+from zyme.parsers.task_yaml import parse_metrics, resolve_smoke_tier
 from zyme.utils import detect_lang, die, task_dir_from_args
 
 
@@ -84,11 +84,25 @@ def _run_evaluate(
 
     # evaluate runs in a temp dir mirroring verify_patch's contract: the
     # script is copied so its relative-path assumptions hold, smoke output
-    # is staged as ``<tmp>/pipeline/``.
-    with tempfile.TemporaryDirectory(prefix="zyme_smoke_parity_") as tmp:
+    # is staged as ``<tmp>/pipeline/``. The tmp dir is anchored UNDER
+    # task_dir (matching R verify.R's .verify_one_tier) so evaluate.R's
+    # upward walk for `autozyme-framework` finds the category-level
+    # symlink alongside the task — /tmp would have no such ancestor.
+    with tempfile.TemporaryDirectory(prefix=".zyme_smoke_parity_", dir=task_dir) as tmp:
         tmp_dir = Path(tmp)
         dest = tmp_dir / evaluate_path.name
         shutil.copy(evaluate_path, dest)
+        # Symlink the category-level autozyme-framework into tmp_dir so
+        # evaluate.R's `while .fw_path ... helpers.R` walk resolves on the
+        # first iteration. Tasks that use file.path(TASK_DIR, "..",
+        # "autozyme-framework") get the same hit. No-op when the symlink
+        # target is missing or the link can't be created.
+        fw_link_target = task_dir.parent / "autozyme-framework"
+        if fw_link_target.exists():
+            try:
+                os.symlink(fw_link_target, tmp_dir / "autozyme-framework")
+            except (OSError, NotImplementedError):
+                pass
         staged_test = tmp_dir / "pipeline"
         if smoke_output_dir.is_dir():
             shutil.copytree(smoke_output_dir, staged_test)
@@ -125,7 +139,14 @@ def _check_thresholds(
             all_pass = False
             continue
         v = metrics[name]
-        direction = spec.get("direction") or spec.get("op") or "gte"
+        # parse_metrics normalizes the field to `comparator`; legacy
+        # `direction` / `op` kept for backward compat.
+        direction = (
+            spec.get("comparator")
+            or spec.get("direction")
+            or spec.get("op")
+            or "gte"
+        )
         threshold = spec.get("threshold")
         ok = True
         if threshold is None:
@@ -151,7 +172,7 @@ def cmd_package_smoke_parity(args) -> int:
     patch = getattr(args, "patch", None) or _infer_patch_name(task_dir)
     if not patch:
         die("could not infer patch name; pass --patch <name>")
-    tier = getattr(args, "tier", None) or "tiny"
+    tier = getattr(args, "tier", None) or resolve_smoke_tier(task_dir / "task.yaml")
     lang = getattr(args, "lang", None) or detect_lang(task_dir)
 
     with tempfile.TemporaryDirectory(prefix="zyme_smoke_") as tmp:

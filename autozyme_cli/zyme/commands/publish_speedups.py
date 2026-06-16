@@ -108,8 +108,9 @@ def _partition_by_platform(content: str) -> dict[str, str]:
     """Split published-rows TSV text into per-platform shards.
 
     Classifies each data row by its ``system_os`` column into ``mac`` / ``win``
-    / ``other`` and returns ``{plat: tsv_text}`` where each value is a complete
-    TSV (the shared header + that platform's rows). Empty input -> ``{}``.
+    / ``linux`` / ``other`` and returns ``{plat: tsv_text}`` where each value is
+    a complete TSV (the shared header + that platform's rows). Empty input ->
+    ``{}``.
     """
     lines = content.splitlines()
     if not lines:
@@ -128,6 +129,8 @@ def _partition_by_platform(content: str) -> dict[str, str]:
             plat = "mac"
         elif "win" in s:
             plat = "win"
+        elif "linux" in s:
+            plat = "linux"
         else:
             plat = "other"
         buckets.setdefault(plat, []).append(line)

@@ -88,6 +88,11 @@ class _Patch:
     tested_against: str | None = None  # e.g. "cell2location 0.1.4"
     tested_upstream_versions: dict[str, list[str]] | None = None
     strict_upstream_versions: bool = False
+    # Runtime libraries the patch imports but does NOT monkey-patch a target in
+    # (e.g. lifelines -> numba): not derivable from `targets`, so declared
+    # explicitly and probed alongside the upstream so a missing one yields a
+    # graceful "requires X" skip instead of an ImportError on activation.
+    runtime_deps: list[str] | None = None
     originals: dict[tuple[str, str], Any] = field(default_factory=dict)
     injected: bool = False
 
@@ -144,6 +149,7 @@ def register_patch(
     tested_against: str | None = None,
     tested_upstream_versions: dict[str, list[str]] | None = None,
     strict_upstream_versions: bool = False,
+    runtime_deps: list[str] | None = None,
 ) -> None:
     """Register a patch. Called by submodule __init__ at import time
     (which only happens when the user explicitly activates the patch).
@@ -161,6 +167,14 @@ def register_patch(
     Set `strict_upstream_versions=True` for patches that bind private
     upstream internals whose signatures are known to drift incompatibly.
     Strict patches refuse activation outside `tested_upstream_versions`.
+
+    `runtime_deps` lists top-level packages the patch imports but does NOT
+    target (so they can't be inferred from ``targets``) and that the upstream
+    does not itself pull in -- e.g. lifelines's Cox kernel needs ``numba``,
+    which lifelines does not depend on. These are probed alongside the upstream
+    (``sync-manifests`` folds them into UPSTREAMS), so a missing one makes
+    ``activate`` print one actionable "requires X" line and decline gracefully
+    rather than ImportError on the module's top-level import.
     """
     # Validate each target tuple up front so misuses (None / non-callable fast
     # fn) fail at register_patch time, not at activate() time three commands
@@ -233,6 +247,14 @@ def register_patch(
         raise ValueError(
             "strict_upstream_versions=True requires tested_upstream_versions"
         )
+    if runtime_deps is not None:
+        if not isinstance(runtime_deps, list) or not all(
+            isinstance(d, str) and d for d in runtime_deps
+        ):
+            raise TypeError(
+                f"patch {name!r} runtime_deps must be a list of non-empty str, "
+                f"got {runtime_deps!r}"
+            )
     _REGISTRY[name] = _Patch(
         name=name,
         targets=list(targets),
@@ -240,6 +262,7 @@ def register_patch(
         tested_against=tested_against,
         tested_upstream_versions=tested_upstream_versions,
         strict_upstream_versions=strict_upstream_versions,
+        runtime_deps=list(runtime_deps) if runtime_deps else None,
     )
     _PROBE_CACHE.pop(name, None)
 
@@ -296,9 +319,12 @@ def _probe_patch_installed(name: str) -> tuple[bool, str | None]:
         if spec is None:
             missing.append(pkg)
     if missing:
+        # "requires X (not installed)" reads correctly whether X is the
+        # accelerated package or a runtime_deps co-dependency (e.g. numba) --
+        # the old "upstream not installed" miscalled co-deps an upstream.
         result: tuple[bool, str | None] = (
             False,
-            f"upstream not installed: {', '.join(missing)}",
+            f"requires {', '.join(missing)} (not installed)",
         )
     else:
         result = (True, None)
@@ -380,16 +406,17 @@ def _emit_activation_marker(p: _Patch) -> None:
 
 
 def _emit_inactive_marker(name: str, err: "str | None") -> None:
-    """One-line stderr note when a patch can't activate because its upstream
-    isn't installed. The success path is loud (_emit_activation_marker), so
-    without this a missing upstream is a silent no-op and the user wrongly
-    believes they're accelerated. Silenced by AUTOZYME_QUIET=1.
+    """One-line stderr note when a patch can't activate because a required
+    package (its upstream, or a declared runtime dependency like numba) isn't
+    installed. The success path is loud (_emit_activation_marker), so without
+    this a missing requirement is a silent no-op and the user wrongly believes
+    they're accelerated. Silenced by AUTOZYME_QUIET=1.
     """
     if os.environ.get("AUTOZYME_QUIET"):
         return
-    detail = f" ({err})" if err else ""
+    detail = err if err else "upstream not installed"
     print(
-        f"[autozyme] {name} NOT activated -- upstream not installed{detail}",
+        f"[autozyme] {name} NOT activated -- {detail}",
         file=sys.stderr,
     )
 

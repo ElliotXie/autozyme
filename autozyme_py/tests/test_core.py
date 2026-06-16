@@ -87,7 +87,7 @@ def test_missing_upstream_short_circuits_before_patch_import(monkeypatch):
     monkeypatch.setattr(
         core,
         "_probe_patch_installed",
-        lambda name: (False, "upstream not installed: missing_demo"),
+        lambda name: (False, "requires missing_demo (not installed)"),
     )
 
     def explode(name):
