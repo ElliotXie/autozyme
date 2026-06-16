@@ -452,6 +452,18 @@ def _fast_rank_genes_groups(
 
     adata = adata.copy() if copy else adata
 
+    # Mirror stock scanpy: coerce str/object groupby to categorical. The fused
+    # path below reads groupby via cat.codes/cat.categories and so assumes it is
+    # already categorical; stock does this coercion via sanitize_anndata before
+    # reading groupby, and this vendored fast path dropped that step (so a str
+    # groupby crashed with "Can only use .cat accessor with a 'category' dtype").
+    # sanitize_anndata is a no-op on already-categorical columns (zero measured
+    # cost on the benchmark path) and uses the same natsort category order as
+    # stock, keeping the output group order bit-identical. Empty categories are
+    # left as-is to match stock, which raises on <2-sample groups, not drops them.
+    from scanpy._utils import sanitize_anndata
+    sanitize_anndata(adata)
+
     if key_added is None:
         key_added = "rank_genes_groups"
     adata.uns[key_added] = {}

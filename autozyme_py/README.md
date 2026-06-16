@@ -1,6 +1,6 @@
 # autozyme
 
-Drop-in accelerators for scientific Python packages. Each accelerator is a validated, monkey-patched fast replacement for a hot function in an upstream library (scanpy, scvelo, etc.). Install once; existing scripts run faster automatically.
+Drop-in accelerators for scientific Python packages. Each accelerator is a validated, monkey-patched fast replacement for a hot function in an upstream library (scanpy, scvelo, etc.). Install once; existing scripts run faster automatically. It bundles no datasets; it accelerates your own data in place.
 
 ## Install
 

@@ -272,9 +272,24 @@ def _build_simple_graph(adjacency, use_weights=True):
     return g
 
 
+def _import_set_igraph_random_state():
+    """Locate scanpy's ``set_igraph_random_state`` across scanpy versions.
+
+    scanpy >= 1.11.x exposes it from the ``scanpy._utils.random`` submodule;
+    scanpy <= 1.11.0 defines it directly in ``scanpy._utils``. Hard-importing
+    only the newer path crashed on 1.11.0 with
+    ``ModuleNotFoundError: No module named 'scanpy._utils.random'``.
+    """
+    try:
+        from scanpy._utils.random import set_igraph_random_state
+    except ModuleNotFoundError:
+        from scanpy._utils import set_igraph_random_state
+    return set_igraph_random_state
+
+
 def _run_leiden_direct(g, random_state, clustering_args):
     """Run Leiden directly in the current process."""
-    from scanpy._utils.random import set_igraph_random_state
+    set_igraph_random_state = _import_set_igraph_random_state()
     with set_igraph_random_state(random_state):
         part = g.community_leiden(**clustering_args)
     return np.array(part.membership, dtype=np.int32)
@@ -286,7 +301,7 @@ def _run_leiden_in_fork(g, n_nodes, random_state, clustering_args):
     import tempfile
     import tracemalloc
 
-    from scanpy._utils.random import set_igraph_random_state
+    set_igraph_random_state = _import_set_igraph_random_state()
 
     shm = tempfile.NamedTemporaryFile(delete=False)
     shm_path = shm.name
