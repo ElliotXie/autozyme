@@ -11,6 +11,7 @@ changing user-visible behavior.
 from __future__ import annotations
 
 import os
+import platform
 import time
 from contextlib import contextmanager
 from typing import Any
@@ -34,7 +35,11 @@ def _orig_umap():
 
 
 def _env_enabled() -> bool:
-    value = os.environ.get("AUTOZYME_SCBLAS_UMAP", "1").strip().lower()
+    # Temporary: the accelerated UMAP path is not yet validated on Windows, so
+    # default it OFF there (fall back to stock uwot/scanpy). Force-enable for
+    # Windows testing with AUTOZYME_SCBLAS_UMAP=1. No effect on macOS/Linux.
+    default = "0" if platform.system() == "Windows" else "1"
+    value = os.environ.get("AUTOZYME_SCBLAS_UMAP", default).strip().lower()
     return value not in {"0", "false", "off", "no"}
 
 

@@ -28,13 +28,14 @@ parameters (`n_comps`, resolution, the data itself, …) can be set freely; a
 handful of parameters per patch are not on the fast path and **fall back to the
 upstream implementation automatically** (correct result, just not accelerated).
 A few documented approximations are validated only at their stated
-configuration. Each patch ships its own `SCOPE.md` in its package directory
-(`src/autozyme/<patch>/SCOPE.md`) documenting its supported scope and
-out-of-scope behavior.
+configuration. Each patch's supported scope and out-of-scope behavior are
+documented in a `SCOPE.md` next to its source in the repository, at
+`autozyme_py/src/autozyme/<patch>/SCOPE.md`
+([github.com/ElliotXie/autozyme](https://github.com/ElliotXie/autozyme)).
 
 A few patches accelerate **version-fragile** upstreams that bind one release's
 internal API (e.g. `cell2location`, pinned to 0.1.5). Those carry a tested
-install recipe under "Tested environment" in their `SCOPE.md` and an opt-in
+install recipe under "Tested environment" in that `SCOPE.md` and an opt-in
 extra, e.g. `pip install "autozyme[cell2location]"`.
 
 ### Opt-out levels

@@ -16,6 +16,8 @@
 ^\.DS_Store$
 ^scripts$
 ^tools$
+^dev$
+^dev/
 ^inst/patches/.*/CHANGELOG\.md$
 ^inst/patches/.*/final_audit\.md$
 ^inst/patches/.*/speedups\.tsv$

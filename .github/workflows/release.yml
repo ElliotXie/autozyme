@@ -1,0 +1,133 @@
+name: Publish autozyme (Python) to PyPI
+
+# Builds cross-platform wheels (cibuildwheel) + an sdist for the autozyme_py
+# package and publishes them to PyPI via Trusted Publishing (OIDC -- no API
+# token stored anywhere). Nothing is uploaded unless you either:
+#   * push a `py-v<version>` tag (e.g. py-v0.3.0) -> publishes to PyPI, or
+#   * run this workflow manually (Actions tab) with a publish target.
+# The default manual run (publish target "none") builds + metadata-checks
+# only: a safe dry run of the whole wheel matrix that uploads nothing.
+#
+# One-time setup before the first real publish (see autozyme_py/RELEASING.md):
+#   1. Register a PyPI Trusted Publisher for repo ElliotXie/autozyme,
+#      workflow `release.yml`, environment `pypi` (and `testpypi` on
+#      test.pypi.org for the rehearsal).
+#   2. Create the matching GitHub environments `pypi` / `testpypi`.
+
+on:
+  push:
+    tags:
+      - "py-v*"
+  workflow_dispatch:
+    inputs:
+      publish_target:
+        description: "Upload built artifacts to:"
+        type: choice
+        options: [none, testpypi, pypi]
+        default: none
+
+permissions:
+  contents: read
+
+jobs:
+  build_wheels:
+    name: wheels (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v4.1.0
+        with:
+          # Monorepo: the package (and its [tool.cibuildwheel] config) lives in
+          # autozyme_py/. config-file defaults to "{package}/pyproject.toml".
+          package-dir: autozyme_py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-wheels-${{ matrix.os }}
+          path: ./wheelhouse/*.whl
+
+  build_sdist:
+    name: sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build sdist
+        working-directory: autozyme_py
+        run: pipx run build --sdist
+
+      - name: Check metadata
+        working-directory: autozyme_py
+        run: pipx run twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-sdist
+          path: autozyme_py/dist/*.tar.gz
+
+  publish_testpypi:
+    name: publish to TestPyPI
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_target == 'testpypi'
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/autozyme/
+    permissions:
+      id-token: write   # OIDC for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - run: ls -lh dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish_pypi:
+    name: publish to PyPI
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    # Only on a version tag, or an explicit manual "pypi" dispatch.
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_target == 'pypi')
+    environment:
+      name: pypi
+      url: https://pypi.org/project/autozyme/
+    permissions:
+      id-token: write   # OIDC for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - run: ls -lh dist
+
+      - name: Guard tag matches package version
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#py-v}"
+          if ! ls dist/autozyme-"${tag}".tar.gz >/dev/null 2>&1; then
+            echo "::error::tag ${GITHUB_REF_NAME} (version ${tag}) has no matching sdist."
+            echo "::error::Bump the version in autozyme_py/pyproject.toml + __init__.py to ${tag} before tagging."
+            ls dist
+            exit 1
+          fi
+          echo "tag ${tag} matches the built sdist"
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

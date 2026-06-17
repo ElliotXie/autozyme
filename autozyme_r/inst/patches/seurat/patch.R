@@ -409,12 +409,18 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
       }
       n.cores <- max(1L, as.integer(n.cores))
 
+      # Accelerated-backend switch. Default "annoy" reproduces stock Seurat's
+      # Annoy neighbor graph (the paper-validated, bit-exact-vs-stock path).
+      # Opt in to the faster exact float32 kNN kernel with
+      # AUTOZYME_SEURAT_FINDNEIGHBORS_BACKEND=exact; its graph differs from
+      # Annoy by design (Annoy is approximate) so it is NOT bit-exact vs stock
+      # Seurat — keep it opt-in so the shipped default matches the paper.
       backend <- tolower(Sys.getenv(
-        "AUTOZYME_SEURAT_FINDNEIGHBORS_BACKEND", unset = "exact"))
-      if (backend %in% c("annoy", "turbo_annoy")) {
-        nn.idx <- turbo_annoy_build_search(data.use, k.param, n.trees, n.cores)
-      } else {
+        "AUTOZYME_SEURAT_FINDNEIGHBORS_BACKEND", unset = "annoy"))
+      if (backend %in% c("exact", "exact_knn", "f32")) {
         nn.idx <- seurat_exact_knn_f32(data.use, k.param, n.cores)
+      } else {
+        nn.idx <- turbo_annoy_build_search(data.use, k.param, n.trees, n.cores)
       }
 
       j <- as.numeric(t(nn.idx))
@@ -2483,6 +2489,13 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
     zyme <- .seurat_zyme_flag(zyme, turbo)
     extra <- list(...)
     fast_ok <- isTRUE(zyme) &&
+      # Temporary Windows gate: the fast RunUMAP path is not yet validated on
+      # Windows, so fall back to stock uwot/Seurat there. Force-enable for
+      # Windows testing with AUTOZYME_SEURAT_RUNUMAP=1; delete this clause once
+      # Windows is validated. No effect on macOS/Linux (code kept, just gated).
+      (.Platform$OS.type != "windows" ||
+         tolower(Sys.getenv("AUTOZYME_SEURAT_RUNUMAP", unset = "0")) %in%
+           c("1", "true", "on", "yes")) &&
       requireNamespace("uwot", quietly = TRUE) &&
       length(extra) == 0L &&
       !is.null(dims) &&

@@ -45,7 +45,6 @@
   infercnv        = "infercnv",
   maftools        = "maftools",
   mast            = "MAST",
-  milor           = "miloR",
   nichenetr       = "nichenetr",
   rctd            = "spacexr",
   scriabin        = "scriabin",

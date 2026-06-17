@@ -7,6 +7,7 @@ Unsupported states and missing native libraries fall back to upstream Scanpy.
 from __future__ import annotations
 
 import os
+import platform
 
 import numpy as np
 import scipy.sparse as sp
@@ -24,7 +25,11 @@ def _orig_neighbors():
 
 
 def _env_enabled() -> bool:
-    value = os.environ.get("AUTOZYME_SCBLAS_NEIGHBORS", "1").strip().lower()
+    # Temporary: the accelerated neighbors path is not yet validated on Windows,
+    # so default it OFF there (fall back to stock scanpy). Force-enable for
+    # Windows testing with AUTOZYME_SCBLAS_NEIGHBORS=1. No effect on macOS/Linux.
+    default = "0" if platform.system() == "Windows" else "1"
+    value = os.environ.get("AUTOZYME_SCBLAS_NEIGHBORS", default).strip().lower()
     return value not in {"0", "false", "off", "no"}
 
 
