@@ -36,7 +36,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # ubuntu-24.04-arm is a free ARM64 Linux runner (public repos): builds
+        # linux aarch64 wheels natively, no QEMU. Each Linux runner builds its
+        # own arch (archs="native" in pyproject).
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v5
 
