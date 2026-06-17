@@ -13,6 +13,9 @@
 #if defined(__ARM_NEON)
 #include <arm_neon.h>
 #endif
+#ifdef _MSC_VER
+#include <malloc.h>   /* _alloca */
+#endif
 
 static inline uint64_t sm64(uint64_t *s){ uint64_t z=(*s+=0x9E3779B97F4A7C15ULL);
   z=(z^(z>>30))*0xBF58476D1CE4E5B9ULL; z=(z^(z>>27))*0x94D049BB133111EBULL; return z^(z>>31); }
@@ -75,7 +78,13 @@ static void rp(rpx*c, int32_t*idx, int lo, int hi, uint64_t*rng){
       hpush(c->hd+(size_t)v*c->k,c->hi+(size_t)v*c->k,c->hf+(size_t)v*c->k,c->k,u,dd); } return; }
   int ia=(int)(sm64(rng)%(uint64_t)n), ib; do{ ib=(int)(sm64(rng)%(uint64_t)n);}while(ib==ia);
   const float*pa=c->X+(size_t)idx[lo+ia]*d, *pb=c->X+(size_t)idx[lo+ib]*d;
-  float dir[d];                                    /* split direction pa->pb (low-d by design) */
+  /* split direction pa->pb (low-d by design). MSVC has no C99 VLA support so
+   * use stack-alloca on Windows; POSIX keeps the VLA (matches original). */
+#ifdef _MSC_VER
+  float *dir = (float*)_alloca((size_t)d * sizeof(float));
+#else
+  float dir[d];
+#endif
   for(int t=0;t<d;++t) dir[t]=pb[t]-pa[t];
   double*pv=c->pv;                                  /* per-thread scratch (no per-node malloc); offset dropped (cancels in median) */
   for(int i=0;i<n;++i) pv[i]=(double)dotp(c->X+(size_t)idx[lo+i]*d, dir, d);
