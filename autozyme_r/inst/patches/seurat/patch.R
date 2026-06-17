@@ -372,6 +372,15 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
                                          cache.index = FALSE,
                                          zyme = TRUE, turbo = NULL, ...) {
     zyme <- .seurat_zyme_flag(zyme, turbo)
+    fallback <- function() {
+      .seurat_orig_FindNeighbors_Seurat(
+        object = object, reduction = reduction, dims = dims, assay = assay,
+        features = features, k.param = k.param, return.neighbor = return.neighbor,
+        compute.SNN = compute.SNN, prune.SNN = prune.SNN, nn.method = nn.method,
+        n.trees = n.trees, annoy.metric = annoy.metric, nn.eps = nn.eps,
+        verbose = verbose, do.plot = do.plot, graph.name = graph.name,
+        l2.norm = l2.norm, cache.index = cache.index, ...)
+    }
     fast_path_ok <- isTRUE(zyme) && inherits(object, "Seurat") &&
                     identical(nn.method, "annoy") &&
                     identical(annoy.metric, "euclidean") &&
@@ -384,53 +393,54 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
                     isFALSE(cache.index) && isFALSE(do.plot) &&
                     isTRUE(nn.eps == 0)
     if (!fast_path_ok) {
-      return(.seurat_orig_FindNeighbors_Seurat(
-        object = object, reduction = reduction, dims = dims, assay = assay,
-        features = features, k.param = k.param, return.neighbor = return.neighbor,
-        compute.SNN = compute.SNN, prune.SNN = prune.SNN, nn.method = nn.method,
-        n.trees = n.trees, annoy.metric = annoy.metric, nn.eps = nn.eps,
-        verbose = verbose, do.plot = do.plot, graph.name = graph.name,
-        l2.norm = l2.norm, cache.index = cache.index, ...))
+      return(fallback())
     }
-    assay <- SeuratObject::DefaultAssay(object[[reduction]])
-    data.use <- SeuratObject::Embeddings(object[[reduction]])[, dims, drop = FALSE]
-    cell.names <- rownames(data.use); n.cells <- nrow(data.use)
-    n.cores <- suppressWarnings(as.integer(Sys.getenv(
-      "OMP_NUM_THREADS", unset = NA_character_)))
-    if (is.na(n.cores) || n.cores < 1L) {
-      n.cores <- parallel::detectCores()
-    }
-    n.cores <- max(1L, as.integer(n.cores))
+    # Runtime guard: if the fast path errors (e.g. the exact-kNN Rcpp kernel or
+    # ComputeSNN fail at runtime), revert to the stock FindNeighbors rather than
+    # surfacing the error. Mirrors fast_RunUMAP_Seurat.
+    out <- tryCatch({
+      assay <- SeuratObject::DefaultAssay(object[[reduction]])
+      data.use <- SeuratObject::Embeddings(object[[reduction]])[, dims, drop = FALSE]
+      cell.names <- rownames(data.use); n.cells <- nrow(data.use)
+      n.cores <- suppressWarnings(as.integer(Sys.getenv(
+        "OMP_NUM_THREADS", unset = NA_character_)))
+      if (is.na(n.cores) || n.cores < 1L) {
+        n.cores <- parallel::detectCores()
+      }
+      n.cores <- max(1L, as.integer(n.cores))
 
-    backend <- tolower(Sys.getenv(
-      "AUTOZYME_SEURAT_FINDNEIGHBORS_BACKEND", unset = "exact"))
-    if (backend %in% c("annoy", "turbo_annoy")) {
-      nn.idx <- turbo_annoy_build_search(data.use, k.param, n.trees, n.cores)
-    } else {
-      nn.idx <- seurat_exact_knn_f32(data.use, k.param, n.cores)
-    }
+      backend <- tolower(Sys.getenv(
+        "AUTOZYME_SEURAT_FINDNEIGHBORS_BACKEND", unset = "exact"))
+      if (backend %in% c("annoy", "turbo_annoy")) {
+        nn.idx <- turbo_annoy_build_search(data.use, k.param, n.trees, n.cores)
+      } else {
+        nn.idx <- seurat_exact_knn_f32(data.use, k.param, n.cores)
+      }
 
-    j <- as.numeric(t(nn.idx))
-    i <- rep(seq_len(n.cells), each = k.param)
-    nn.matrix <- Matrix::sparseMatrix(i = i, j = j, x = 1,
-                                       dims = c(n.cells, n.cells),
-                                       dimnames = list(cell.names, cell.names))
-    nn.matrix <- methods::as(nn.matrix, "Graph")
-    SeuratObject::DefaultAssay(nn.matrix) <- assay
+      j <- as.numeric(t(nn.idx))
+      i <- rep(seq_len(n.cells), each = k.param)
+      nn.matrix <- Matrix::sparseMatrix(i = i, j = j, x = 1,
+                                         dims = c(n.cells, n.cells),
+                                         dimnames = list(cell.names, cell.names))
+      nn.matrix <- methods::as(nn.matrix, "Graph")
+      SeuratObject::DefaultAssay(nn.matrix) <- assay
 
-    if (compute.SNN) {
-      snn.matrix <- Seurat:::ComputeSNN(nn_ranked = nn.idx, prune = prune.SNN)
-      rownames(snn.matrix) <- cell.names
-      colnames(snn.matrix) <- cell.names
-      snn.matrix <- SeuratObject::as.Graph(snn.matrix)
-      SeuratObject::DefaultAssay(snn.matrix) <- assay
-    }
-    graph.name <- if (is.null(graph.name)) paste0(assay, "_", c("nn", "snn")) else graph.name
-    object[[graph.name[1]]] <- nn.matrix
-    if (compute.SNN && length(graph.name) >= 2) {
-      object[[graph.name[2]]] <- snn.matrix
-    }
-    object
+      if (compute.SNN) {
+        snn.matrix <- Seurat:::ComputeSNN(nn_ranked = nn.idx, prune = prune.SNN)
+        rownames(snn.matrix) <- cell.names
+        colnames(snn.matrix) <- cell.names
+        snn.matrix <- SeuratObject::as.Graph(snn.matrix)
+        SeuratObject::DefaultAssay(snn.matrix) <- assay
+      }
+      graph.name <- if (is.null(graph.name)) paste0(assay, "_", c("nn", "snn")) else graph.name
+      object[[graph.name[1]]] <- nn.matrix
+      if (compute.SNN && length(graph.name) >= 2) {
+        object[[graph.name[2]]] <- snn.matrix
+      }
+      object
+    }, error = function(e) NULL)
+    if (!is.null(out)) return(out)
+    fallback()
   }
 
   # ── FindAllMarkers ───────────────────────────────────────────────────────

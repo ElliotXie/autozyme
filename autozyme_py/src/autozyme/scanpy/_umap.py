@@ -327,5 +327,10 @@ def fast_umap(
     try:
         with _patched_umap_layout(wrapper):
             return original(adata, **call)
-    except _FallbackToOriginal:
+    except Exception:
+        # Any failure in the native layout path -- the explicit
+        # _FallbackToOriginal signal or an unexpected error from the C kernel --
+        # reverts to the stock uwot/scanpy layout instead of surfacing the error.
+        # _patched_umap_layout's finally has already restored the original layout
+        # function, so this re-run is the unmodified baseline.
         return original(adata, **call)
