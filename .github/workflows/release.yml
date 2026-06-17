@@ -95,6 +95,9 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          # 0.3.0's sdist + macOS wheels were uploaded manually; skip them and
+          # publish only the files this run adds (Linux/Windows/other wheels).
+          skip-existing: true
 
   publish_pypi:
     name: publish to PyPI
@@ -131,3 +134,8 @@ jobs:
           echo "tag ${tag} matches the built sdist"
 
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # 0.3.0's sdist + macOS wheels were uploaded manually; skip them and
+          # publish only the files this run adds (Linux/Windows/other wheels).
+          # Harmless for future fresh versions (nothing to skip).
+          skip-existing: true

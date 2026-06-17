@@ -22,12 +22,14 @@ speedup without a local compiler.
 
 The build matrix is configured in `[tool.cibuildwheel]` in `pyproject.toml`.
 
-## One-time setup (before the first publish)
+## One-time setup (before the first CI publish)
 
-1. **PyPI Trusted Publisher** -- on https://pypi.org, project `autozyme`
-   (use "pending publisher" since the project does not exist yet), add a
-   GitHub Actions publisher:
-   - Owner: `ElliotXie`  ·  Repo: `autozyme`
+The project `autozyme` already exists on PyPI (0.3.0 was uploaded manually), so
+this is a normal Trusted Publisher on the existing project, not a pending one.
+
+1. **PyPI Trusted Publisher** -- https://pypi.org/manage/project/autozyme/settings/publishing/
+   -> "Add a new publisher" -> GitHub Actions:
+   - Owner: `ElliotXie`  ·  Repository: `autozyme`
    - Workflow filename: `release.yml`
    - Environment name: `pypi`
 2. **TestPyPI Trusted Publisher** -- same on https://test.pypi.org, environment
