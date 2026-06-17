@@ -22,6 +22,29 @@ authors:
 repository-code: "https://github.com/ElliotXie/autozyme"
 url: "https://www.autozyme.com"
 license: MIT
+preferred-citation:
+  type: article
+  title: "AutoZyme: An Autonomous Agentic Framework to Optimize Bioinformatics Software"
+  authors:
+    - given-names: Elliot
+      family-names: Xie
+      affiliation: "University of Wisconsin-Madison"
+    - given-names: Lingxin
+      family-names: Cheng
+      affiliation: "University of Wisconsin-Madison"
+    - given-names: Yujia
+      family-names: Cai
+      affiliation: "University of Wisconsin-Madison"
+    - given-names: Jack
+      family-names: Shireman
+      affiliation: "University of Wisconsin-Madison"
+    - given-names: Christina
+      family-names: Kendziorski
+      affiliation: "University of Wisconsin-Madison"
+  journal: bioRxiv
+  year: 2026
+  doi: "10.64898/2026.06.12.731250"
+  url: "https://www.biorxiv.org/content/10.64898/2026.06.12.731250v1"
 keywords:
   - bioinformatics
   - single-cell

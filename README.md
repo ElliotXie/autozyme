@@ -2,8 +2,8 @@
 
 **AutoZyme** is an autonomous multi-agent framework that speeds up scientific software on CPUs while preserving the original results. Install **AutoZyme-Library** for drop-in accelerators of Seurat, Scanpy, and 30+ packages, or run the framework to optimize a function it doesn't ship yet.
 
-<!-- TODO: point preprint -> bioRxiv/arXiv and docs -> docs site once live (currently placeholder #) -->
-[![Preprint](https://img.shields.io/badge/preprint-available-brightgreen)](#)
+<!-- TODO: point docs badge -> docs site once a stable docs URL is chosen (currently placeholder #) -->
+[![Preprint](https://img.shields.io/badge/preprint-bioRxiv-brightgreen)](https://www.biorxiv.org/content/10.64898/2026.06.12.731250v1)
 [![Docs](https://img.shields.io/badge/docs-available-brightgreen)](#)
 [![Website](https://img.shields.io/badge/website-autozyme.com-1f6feb)](https://www.autozyme.com)
 [![Datasets](https://img.shields.io/badge/datasets-HuggingFace-ffce1c?logo=huggingface&logoColor=white)](https://huggingface.co/datasets/elliotxie/autozyme-datasets)
@@ -111,10 +111,12 @@ hf download elliotxie/autozyme-datasets \
 ## Citation
 
 ```bibtex
-@software{autozyme2025,
-  author = {Xie, Elliot},
-  title = {AutoZyme: Autonomous CPU-side Acceleration of Scientific Computing Functions},
-  year = {2025},
-  url = {https://github.com/ElliotXie/autozyme}
+@article{xie2026autozyme,
+  title   = {AutoZyme: An Autonomous Agentic Framework to Optimize Bioinformatics Software},
+  author  = {Xie, Elliot and Cheng, Lingxin and Cai, Yujia and Shireman, Jack and Kendziorski, Christina},
+  journal = {bioRxiv},
+  year    = {2026},
+  doi     = {10.64898/2026.06.12.731250},
+  url     = {https://www.biorxiv.org/content/10.64898/2026.06.12.731250v1}
 }
 ```
