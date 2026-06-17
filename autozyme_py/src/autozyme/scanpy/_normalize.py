@@ -26,7 +26,7 @@ import numba as nb
 import numpy as np
 from scipy import sparse
 
-from autozyme._threads import safe_set_num_threads
+from autozyme._threads import auto_threads, safe_set_num_threads
 
 _INT32_MAX = 2**31 - 1
 _DTYPE_WARNED = False
@@ -140,7 +140,10 @@ def _n_threads():
                 return n
         except (TypeError, ValueError):
             pass
-    return os.cpu_count() or 8
+    # No explicit knob set: defer to the unified resolver (scale-to-hardware,
+    # capped at 16) rather than raw cpu_count(). scanpy's numba family scales
+    # past 4 threads (finalized t4 is 2-4x slower than best), so default=None.
+    return auto_threads(default=None)
 
 
 def _orig(name: str):

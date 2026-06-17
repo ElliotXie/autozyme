@@ -17,6 +17,8 @@ from typing import Any
 
 import numpy as np
 
+from autozyme._threads import auto_threads
+
 _NATIVE = None
 _NATIVE_TRIED = False
 _NATIVE_LOAD_KEY = None
@@ -52,7 +54,9 @@ def _n_threads() -> int:
             continue
         if value > 0:
             return value
-    return os.cpu_count() or 1
+    # No explicit knob set: defer to the unified resolver (scale-to-hardware,
+    # capped at 16) rather than raw cpu_count().
+    return auto_threads(default=None)
 
 
 def _load_native_umap():
