@@ -102,7 +102,9 @@ testpaths = ["tests"]
 # _OptionalBuildExt falls back to stock scanpy if it won't compile -- so a
 # wheel always builds even on a toolchain where the kernel can't.
 build = "cp310-* cp311-* cp312-* cp313-*"
-skip = "*-musllinux_* *_i686 *-win32 pp*"
+# PyPy is not enabled (cibuildwheel 4.x builds CPython only by default), so it
+# needs no skip entry. musllinux (Alpine) is unvalidated; 32-bit is dropped.
+skip = "*-musllinux_* *_i686 *-win32"
 build-frontend = "build"
 # Import-smoke every built wheel in an isolated env: it must import and
 # register patches. Deliberately light -- the full pytest suite (which pulls
