@@ -27,11 +27,37 @@
 #           extract_params slow .call parsing on the final compareClusterResult
 #           constructor.
 #
-if (requireNamespace("clusterProfiler", quietly = TRUE) &&
-    requireNamespace("DOSE",            quietly = TRUE) &&
-    requireNamespace("GOSemSim",        quietly = TRUE) &&
-    requireNamespace("AnnotationDbi",   quietly = TRUE) &&
-    requireNamespace("GO.db",           quietly = TRUE)) {
+.deps_present <- requireNamespace("clusterProfiler", quietly = TRUE) &&
+  requireNamespace("DOSE",            quietly = TRUE) &&
+  requireNamespace("GOSemSim",        quietly = TRUE) &&
+  requireNamespace("AnnotationDbi",   quietly = TRUE) &&
+  requireNamespace("GO.db",           quietly = TRUE)
+
+# Version gate. This patch hooks DOSE's hypergeometric ORA internals
+# (enricher_internal, EXTID2TERMID, ALLEXTID, TERMID2EXTID, TERM2NAME) via
+# getFromNamespace(.., "DOSE"). That path exists in clusterProfiler 4.16.x /
+# DOSE 4.2.x (Bioconductor 3.21) — what the patch was lifted and measured
+# against. clusterProfiler >= 4.19 + the matching newer DOSE (e.g. DOSE 4.6)
+# moved the ORA core into the `enrichit` package (enrichGO -> enrichit::ora_gson)
+# and no longer expose those symbols from DOSE, so the getFromNamespace() calls
+# below would abort while sourcing this file and crash activate(). Decline to
+# register on that path (leaving stock clusterProfiler untouched) instead, and
+# emit a one-line reason since DOSE *is* installed (a silent skip would be
+# confusing). No-op on the validated 4.16.x / 4.2.x environment.
+.dose_ora_path_ok <- .deps_present && all(vapply(
+  c("enricher_internal", "EXTID2TERMID", "ALLEXTID", "TERMID2EXTID", "TERM2NAME"),
+  function(fn) exists(fn, envir = asNamespace("DOSE"), inherits = FALSE),
+  logical(1)))
+if (.deps_present && !.dose_ora_path_ok) {
+  message(sprintf(paste0(
+    "[autozyme] 'clusterprofiler' patch not registered: installed DOSE %s does ",
+    "not expose the enricher_internal ORA path this patch targets. ",
+    "clusterProfiler >= 4.19 routes ORA through enrichit::ora_gson. Pin ",
+    "clusterProfiler 4.16.x + DOSE 4.2.x (Bioconductor 3.21) to use this patch."),
+    as.character(utils::packageVersion("DOSE"))))
+}
+
+if (.dose_ora_path_ok) {
 
   # Originals + internal helpers captured via getFromNamespace. The fast
   # functions reference them via lexical closure — no environment(fast_) <-
