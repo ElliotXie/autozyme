@@ -5,12 +5,14 @@ Drop-in accelerators for scientific R packages. Each accelerator is a validated,
 ## Install
 
 ```r
-# from local source
-R CMD INSTALL autozyme
+# from GitHub (the R package is in the autozyme_r/ subdir)
+remotes::install_github("ElliotXie/autozyme", subdir = "autozyme_r")
 
-# or from GitHub once published
-remotes::install_github("xie227/autozyme")
+# or from a local checkout
+R CMD INSTALL autozyme_r
 ```
+
+The package compiles C++ (Rcpp) kernels on install, so it needs a C/C++ toolchain: **Windows** = [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (matching your R version), **macOS** = Xcode Command Line Tools (`xcode-select --install`), **Linux** = a compiler (e.g. `build-essential`). Installing via `remotes` / `devtools` / `pak` warns you up front if it is missing.
 
 `autozyme` itself does not Depend on any upstream package. A patch activates only if its upstream is installed in your library.
 
