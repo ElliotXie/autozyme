@@ -27,13 +27,13 @@ autozyme::activate("seurat")
 markers <- FindAllMarkers(obj)
 ```
 
-> The R package compiles C++ kernels on install, so it needs a C/C++ toolchain: **Windows** = [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (match your R version), **macOS** = Xcode Command Line Tools (`xcode-select --install`), **Linux** = a compiler. Installing via `remotes` / `pak` warns you if it is missing.
+> The R package compiles C++ kernels at install. This only really trips up **Windows** (no built-in compiler): install [Rtools](https://cran.r-project.org/bin/windows/Rtools/) matching your R version first, or the build fails. macOS (Xcode Command Line Tools) and Linux (gcc) normally already have a compiler.
 
 ### Python
 
 ```python
 # install
-pip install "git+https://github.com/ElliotXie/autozyme.git#subdirectory=autozyme_py"
+pip install autozyme
 
 # activate  (Scanpy, Squidpy, CellPhoneDB, and more)
 import autozyme
