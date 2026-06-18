@@ -27,6 +27,8 @@ autozyme::activate("seurat")
 markers <- FindAllMarkers(obj)
 ```
 
+> The R package compiles C++ kernels on install, so it needs a C/C++ toolchain: **Windows** = [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (match your R version), **macOS** = Xcode Command Line Tools (`xcode-select --install`), **Linux** = a compiler. Installing via `remotes` / `pak` warns you if it is missing.
+
 ### Python
 
 ```python
