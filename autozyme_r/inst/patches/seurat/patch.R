@@ -498,6 +498,9 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
     }
 
     dots <- list(...)
+    # only.pos is supported on the fast path (one-sided lfc pre-filter + a
+    # post fc>0 filter below), so it is NOT a fallback trigger — same kernel,
+    # same speed, just a different fold-change gate.
     fast_path_ok <- isTRUE(zyme) &&
       identical(test.use, "wilcox") &&
       identical(slot, "data") &&
@@ -506,7 +509,6 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
       is.null(latent.vars) &&
       is.null(mean.fxn) &&
       is.null(fc.name) &&
-      !isTRUE(only.pos) &&
       !isTRUE(densify) &&
       is.infinite(max.cells.per.ident) &&
       identical(min.diff.pct, -Inf) &&
@@ -601,8 +603,10 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
             log((total.sum - sums.1 + pseudocount.use) / n2, base = base)
       pct.1.full <- round(counts.1 / n1, digits = 3)
       pct.2.full <- round(counts.2 / n2, digits = 3)
+      # only.pos uses a one-sided fold-change gate (fc >= threshold), matching
+      # Seurat's pre-test feature selection; otherwise two-sided (abs).
       pass <- (pmax(pct.1.full, pct.2.full) >= min.pct) &
-              (abs(fc) >= logfc.threshold)
+              (if (only.pos) fc >= logfc.threshold else abs(fc) >= logfc.threshold)
       feat.idx <- which(pass)
       if (length(feat.idx) == 0L) next
       de.results <- data.frame(
@@ -614,6 +618,10 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
         check.names = FALSE
       )
       colnames(de.results) <- c("p_val", fc.name, "pct.1", "pct.2")
+      if (only.pos) {
+        de.results <- de.results[de.results[[fc.name]] > 0, , drop = FALSE]
+        if (nrow(de.results) == 0L) next
+      }
       de.results <- de.results[order(de.results$p_val,
                                       -abs(de.results$pct.1 - de.results$pct.2)), ,
                                 drop = FALSE]
@@ -667,6 +675,8 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
 
     dots <- list(...)
     # Same gate as fusion so both modes benchmark the same supported scope.
+    # only.pos is handled in-body (one-sided pre-filter at the pass.mat step +
+    # post fc>0 filter), so it is not a fallback trigger.
     fast_path_ok <- isTRUE(zyme) &&
       identical(test.use, "wilcox") &&
       identical(slot, "data") &&
@@ -675,7 +685,6 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
       is.null(latent.vars) &&
       is.null(mean.fxn) &&
       is.null(fc.name) &&
-      !isTRUE(only.pos) &&
       !isTRUE(densify) &&
       is.infinite(max.cells.per.ident) &&
       identical(min.diff.pct, -Inf) &&
@@ -795,6 +804,10 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
         row.names   = all.features[cl.idx],
         check.names = FALSE)
       colnames(de.results) <- c("p_val", fc.name, "pct.1", "pct.2")
+      if (only.pos) {
+        de.results <- de.results[de.results[[fc.name]] > 0, , drop = FALSE]
+        if (nrow(de.results) == 0L) next
+      }
       de.results <- de.results[order(de.results$p_val,
                                      -abs(de.results$pct.1 - de.results$pct.2)), ,
                                drop = FALSE]
@@ -1019,8 +1032,9 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
   # multi-level ident.2: neglog10_p spearman = 1.0, q99 |avg_log2FC| diff
   # < 1e-15, top50 jaccard = 1.0). This also accelerates FindConservedMarkers,
   # which calls FindMarkers per grouping.var level with an explicit ident.2.
-  # Any other shape (group.by/subset.ident/reduction/latent.vars, non-wilcox
-  # test, only.pos, non-default base/min.diff.pct/max.cells.per.ident, explicit
+  # only.pos is supported on the fast path (one-sided lfc pre-filter + post
+  # fc>0 filter). Any other shape (group.by/subset.ident/reduction/latent.vars,
+  # non-wilcox test, non-default base/min.diff.pct/max.cells.per.ident, explicit
   # zyme=FALSE) falls back to the original method untouched.
   fast_FindMarkers_Seurat <- function(object, ident.1 = NULL, ident.2 = NULL,
                                       latent.vars = NULL, group.by = NULL,
@@ -1052,7 +1066,7 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
       !is.null(dots[["features"]]) || !is.null(dots[["mean.fxn"]]) ||
       !is.null(dots[["fc.name"]]) ||
       !identical(test.use, "wilcox") || !identical(slot, "data") ||
-      isTRUE(only.pos) || base != 2 || is.finite(mcpi) || min.diff.pct > -Inf ||
+      base != 2 || is.finite(mcpi) || min.diff.pct > -Inf ||
       is.null(ident.1) || length(ident.1) != 1L ||
       # min.cells.group is enforced here as the hard-coded `< 3` fallback below;
       # min.cells.feature pre-filters features in stock Seurat but not here.
@@ -1114,7 +1128,10 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
     pct.1 <- round(counts.1 / n.1, 3)
     pct.2 <- round(counts.2 / n.2, 3)
 
-    features.use <- which(pmax(pct.1, pct.2) >= min.pct & abs(fc) >= logfc.thr)
+    # only.pos: one-sided lfc pre-filter (matches Seurat's feature selection),
+    # else two-sided.
+    lfc.pass <- if (only.pos) fc >= logfc.thr else abs(fc) >= logfc.thr
+    features.use <- which(pmax(pct.1, pct.2) >= min.pct & lfc.pass)
     if (length(features.use) == 0L) return(fallback())
 
     out <- data.frame(
@@ -1123,6 +1140,7 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
       pct.1      = pct.1[features.use],
       pct.2      = pct.2[features.use],
       row.names  = feature.names[features.use], check.names = FALSE)
+    if (only.pos) out <- out[out$avg_log2FC > 0, , drop = FALSE]
     out <- out[order(out$p_val, -abs(out$pct.1 - out$pct.2)), , drop = FALSE]
     out$p_val_adj <- p.adjust(out$p_val, method = "bonferroni", n = n.features.total)
     out
