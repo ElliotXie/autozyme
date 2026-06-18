@@ -12,7 +12,7 @@ remotes::install_github("ElliotXie/autozyme", subdir = "autozyme_r")
 R CMD INSTALL autozyme_r
 ```
 
-The package compiles C++ (Rcpp) kernels on install, so it needs a C/C++ toolchain: **Windows** = [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (matching your R version), **macOS** = Xcode Command Line Tools (`xcode-select --install`), **Linux** = a compiler (e.g. `build-essential`). Installing via `remotes` / `devtools` / `pak` warns you up front if it is missing.
+The package compiles C++ (Rcpp) kernels at install. This only really trips up **Windows** (no built-in compiler): install [Rtools](https://cran.r-project.org/bin/windows/Rtools/) matching your R version first, or the build fails. macOS (Xcode Command Line Tools) and Linux (gcc) normally already have a compiler.
 
 `autozyme` itself does not Depend on any upstream package. A patch activates only if its upstream is installed in your library.
 
