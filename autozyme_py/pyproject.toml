@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "autozyme"
-version = "0.3.0"
+version = "0.3.1"
 description = "Drop-in accelerators for scientific Python packages"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -97,8 +97,8 @@ testpaths = ["tests"]
 
 [tool.cibuildwheel]
 # Cross-platform wheel build for PyPI (driven by .github/workflows/release.yml).
-# CPython 3.10-3.13 only: the codebase is numba/numpy-heavy and PyPy is
-# untested. The native `_native_scanpy` C extension is OPTIONAL -- setup.py's
+# CPython 3.10-3.14: the codebase is numba/numpy-heavy and PyPy is untested.
+# The native `_native_scanpy` C extension is OPTIONAL -- setup.py's
 # _OptionalBuildExt falls back to stock scanpy if it won't compile -- so a
 # wheel always builds even on a toolchain where the kernel can't.
 build = "cp310-* cp311-* cp312-* cp313-* cp314-*"

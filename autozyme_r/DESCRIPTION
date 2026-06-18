@@ -1,7 +1,7 @@
 Package: autozyme
 Type: Package
 Title: Drop-in Accelerators for Scientific R Packages
-Version: 0.3.0
+Version: 0.3.1
 Authors@R: person(given = "Elliot", family = "Xie",
     role = c("aut", "cre"), email = "xie227@wisc.edu")
 Author: Elliot Xie [aut, cre]

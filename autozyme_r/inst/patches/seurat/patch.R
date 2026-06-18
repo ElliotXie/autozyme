@@ -2489,13 +2489,6 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
     zyme <- .seurat_zyme_flag(zyme, turbo)
     extra <- list(...)
     fast_ok <- isTRUE(zyme) &&
-      # Temporary Windows gate: the fast RunUMAP path is not yet validated on
-      # Windows, so fall back to stock uwot/Seurat there. Force-enable for
-      # Windows testing with AUTOZYME_SEURAT_RUNUMAP=1; delete this clause once
-      # Windows is validated. No effect on macOS/Linux (code kept, just gated).
-      (.Platform$OS.type != "windows" ||
-         tolower(Sys.getenv("AUTOZYME_SEURAT_RUNUMAP", unset = "0")) %in%
-           c("1", "true", "on", "yes")) &&
       requireNamespace("uwot", quietly = TRUE) &&
       length(extra) == 0L &&
       !is.null(dims) &&
