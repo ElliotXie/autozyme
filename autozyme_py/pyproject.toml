@@ -119,12 +119,21 @@ test-command = "python -c \"import autozyme; n=len(autozyme.list_patches()); ass
 # release.yml matrix together cover x86_64 + aarch64. Both manylinux and
 # musllinux are built (musllinux skip removed above).
 archs = ["native"]
+# The native kernel MUST compile on manylinux + musllinux (both verified to
+# ship _native_scanpy.*.so), so assert it imports here: a silent
+# _OptionalBuildExt fallback that drops the .so then fails CI instead of
+# shipping a kernel-less wheel. The Windows base test-command stays lenient --
+# its MSVC build path is wired but not yet CI-proven.
+test-command = "python -c \"import autozyme, autozyme._native_scanpy; n=len(autozyme.list_patches()); assert n>0, n; print('cibw native+smoke OK:', n, 'patches')\""
 
 [tool.cibuildwheel.macos]
 # Both Apple architectures from one arm64 runner. cibuildwheel sets the
 # correct per-arch MACOSX_DEPLOYMENT_TARGET and skips the test phase for the
 # non-native (x86_64) arch automatically.
 archs = ["x86_64", "arm64"]
+# arm64 (the runner's native arch, the only one tested) must ship the kernel;
+# assert it imports for the same reason as Linux.
+test-command = "python -c \"import autozyme, autozyme._native_scanpy; n=len(autozyme.list_patches()); assert n>0, n; print('cibw native+smoke OK:', n, 'patches')\""
 
 [tool.cibuildwheel.windows]
 # win_amd64 only. setup.py wires the MSVC /std:c11 path for the C kernel; if
