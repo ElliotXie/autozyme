@@ -2636,7 +2636,10 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
       FindVariableFeatures.StdAssay   = fast_FindVariableFeatures_StdAssay,
       VST.dgCMatrix                   = fast_VST_dgCMatrix,
       ScaleData.Seurat                = fast_ScaleData_Seurat,
-      FindNeighbors.Seurat            = fast_FindNeighbors_Seurat,
+      # TEMPORARILY DISABLED (2026-06-22): FindNeighbors fast path reverted to
+      # stock Seurat, pending cross-platform (Windows/macOS/Linux) validation.
+      # To restore, uncomment the line below.
+      # FindNeighbors.Seurat            = fast_FindNeighbors_Seurat,
       FindAllMarkers                  = fast_FindAllMarkers,
       FindMarkers.Seurat              = fast_FindMarkers_Seurat,
       RunPCA.StdAssay                 = fast_RunPCA_StdAssay,
@@ -2648,9 +2651,12 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
       CCAIntegration                  = fast_CCAIntegration,
       SCTransform.Seurat              = fast_SCTransform_Seurat,
       SCTransform.default             = fast_SCTransform_default
-    ), if (requireNamespace("uwot", quietly = TRUE)) {
-      list(RunUMAP.Seurat = fast_RunUMAP_Seurat)
-    } else {
+    ), {
+      # TEMPORARILY DISABLED (2026-06-22): RunUMAP fast path reverted to stock
+      # Seurat (uwot), pending cross-platform (Windows/macOS/Linux) validation.
+      # To restore, swap the `list()` below for the original conditional:
+      #   if (requireNamespace("uwot", quietly = TRUE))
+      #     list(RunUMAP.Seurat = fast_RunUMAP_Seurat) else list()
       list()
     }),
     smoke = list(
