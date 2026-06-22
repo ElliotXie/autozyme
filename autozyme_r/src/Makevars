@@ -1,4 +1,11 @@
-RCPPPARALLEL_LIBDIR = $(shell "${R_HOME}/bin/Rscript" -e "cat(system.file('lib', package='RcppParallel'))")
+# --no-init-file --no-site-file: do NOT source the user's .Rprofile / Rprofile.site
+# when querying RcppParallel flags. Anything those profiles print to stdout (e.g. a
+# CRAN-mirror banner like "CRAN镜像已设置为清华大学(TUNA)源") would otherwise be
+# captured by $(shell ...) and spliced into the g++ command line, breaking the build
+# (a stray "(" trips the shell). .Renviron is still read, so custom library paths
+# (R_LIBS_USER) keep working. See GitHub issue #1.
+RSCRIPT = "${R_HOME}/bin/Rscript" --no-init-file --no-site-file
+RCPPPARALLEL_LIBDIR = $(shell $(RSCRIPT) -e "cat(system.file('lib', package='RcppParallel'))")
 PKG_CPPFLAGS = -I. -DSCBLAS_BUILDING
 # Accelerate framework is intentionally NOT linked at build time. wgcna.cpp
 # resolves cblas_dgemm via dlopen on first call instead. Link-time
@@ -47,6 +54,6 @@ DARWIN_OMP_LD  = $(shell uname -s | grep -q Darwin && { \
 # from -O3 on tight sort/reduce loops. $(SHLIB_OPENMP_CXXFLAGS) is supplied by
 # R per-platform (-fopenmp on Linux/Rtools; empty on macOS where the Darwin
 # variables above take over).
-PKG_CXXFLAGS = $(shell "${R_HOME}/bin/Rscript" -e "RcppParallel::CxxFlags()") -DRCPP_PARALLEL_USE_TBB=1 $(SHLIB_OPENMP_CXXFLAGS) $(DARWIN_OMP_CXX) -O3
-PKG_LIBS = $(shell "${R_HOME}/bin/Rscript" -e "RcppParallel::RcppParallelLibs()") -Wl,-rpath,$(RCPPPARALLEL_LIBDIR) $(ACCELERATE_LIBS) $(SHLIB_OPENMP_CXXFLAGS) $(DARWIN_OMP_LD)
+PKG_CXXFLAGS = $(shell $(RSCRIPT) -e "RcppParallel::CxxFlags()") -DRCPP_PARALLEL_USE_TBB=1 $(SHLIB_OPENMP_CXXFLAGS) $(DARWIN_OMP_CXX) -O3
+PKG_LIBS = $(shell $(RSCRIPT) -e "RcppParallel::RcppParallelLibs()") -Wl,-rpath,$(RCPPPARALLEL_LIBDIR) $(ACCELERATE_LIBS) $(SHLIB_OPENMP_CXXFLAGS) $(DARWIN_OMP_LD)
 CXX_STD = CXX17

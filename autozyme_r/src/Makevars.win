@@ -1,6 +1,12 @@
-RCPPPARALLEL_LIBDIR = $(shell "${R_HOME}/bin${R_ARCH_BIN}/Rscript" -e "cat(system.file('lib', package='RcppParallel'))")
+# --no-init-file --no-site-file: do NOT source the user's .Rprofile / Rprofile.site
+# when querying RcppParallel flags. Anything those profiles print to stdout (e.g. a
+# CRAN-mirror banner like "CRAN镜像已设置为清华大学(TUNA)源") would otherwise be
+# captured by $(shell ...) and spliced into the g++ command line, breaking the build.
+# .Renviron is still read, so custom library paths keep working. See GitHub issue #1.
+RSCRIPT = "${R_HOME}/bin${R_ARCH_BIN}/Rscript" --no-init-file --no-site-file
+RCPPPARALLEL_LIBDIR = $(shell $(RSCRIPT) -e "cat(system.file('lib', package='RcppParallel'))")
 PKG_CPPFLAGS = -I. -DSCBLAS_BUILDING
 PKG_CFLAGS = -pthread -O3
-PKG_CXXFLAGS = $(shell "${R_HOME}/bin${R_ARCH_BIN}/Rscript" -e "RcppParallel::CxxFlags()") -DRCPP_PARALLEL_USE_TBB=1 $(SHLIB_OPENMP_CXXFLAGS) -pthread -O3
-PKG_LIBS = $(shell "${R_HOME}/bin${R_ARCH_BIN}/Rscript" -e "RcppParallel::RcppParallelLibs()") $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) $(SHLIB_OPENMP_CXXFLAGS) -pthread
+PKG_CXXFLAGS = $(shell $(RSCRIPT) -e "RcppParallel::CxxFlags()") -DRCPP_PARALLEL_USE_TBB=1 $(SHLIB_OPENMP_CXXFLAGS) -pthread -O3
+PKG_LIBS = $(shell $(RSCRIPT) -e "RcppParallel::RcppParallelLibs()") $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) $(SHLIB_OPENMP_CXXFLAGS) -pthread
 CXX_STD = CXX17
