@@ -1931,6 +1931,16 @@ if (requireNamespace("Seurat", quietly = TRUE) &&
     }
     arguments <- as.list(environment())
     arguments <- arguments[!names(arguments) %in% c("umi", "cell_attr")]
+    # as.list(environment()) also captured the local helper fns (make_cell_attr,
+    # row_gmean, get_model_pars, ...). This `arguments` list is persisted into
+    # SCTModel@arguments, and the turbo path temporarily swaps sctransform's
+    # row_gmean for a `cached_row_gmean` closure whose enclosing env is the whole
+    # fast_SCTransform frame (full umi matrix + CSR intermediates). Serializing
+    # the model (qs2/saveRDS) then walks that env and drags the matrix in — the
+    # saved object balloons (~200 MB extra on a 5k-cell set) while object.size,
+    # which does not recurse into closure envs, reports it as tiny. Upstream
+    # sctransform stores only scalar params here, so drop the function entries.
+    arguments <- arguments[!vapply(arguments, is.function, logical(1))]
     if (startsWith(method, "offset")) {
       cell_attr <- NULL; latent_var <- c("log_umi"); batch_var <- NULL
       latent_var_nonreg <- NULL; n_genes <- NULL; n_cells <- NULL
