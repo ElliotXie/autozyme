@@ -285,6 +285,18 @@ zyme_soft_assignment <- function(X, C, sigma) {
     .Call(`_autozyme_zyme_soft_assignment`, X, C, sigma)
 }
 
+soupx_expand_corrected_x_cpp <- function(p, row_i, x, n_soup, cluster_id, cell_weights) {
+    .Call(`_autozyme_soupx_expand_corrected_x_cpp`, p, row_i, x, n_soup, cluster_id, cell_weights)
+}
+
+soupx_cluster_soup_from_cells_cpp <- function(p, row_i, x, cluster_id, cell_targets, soup_frac, n_genes, n_clusters) {
+    .Call(`_autozyme_soupx_cluster_soup_from_cells_cpp`, p, row_i, x, cluster_id, cell_targets, soup_frac, n_genes, n_clusters)
+}
+
+soupx_adjust_counts_no_cluster_x_cpp <- function(p, row_i, x, cell_targets, soup_frac, n_genes) {
+    .Call(`_autozyme_soupx_adjust_counts_no_cluster_x_cpp`, p, row_i, x, cell_targets, soup_frac, n_genes)
+}
+
 nb_Dd_cpp <- function(y, mu, theta_log, wt, level) {
     .Call(`_autozyme_nb_Dd_cpp`, y, mu, theta_log, wt, level)
 }

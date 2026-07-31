@@ -1132,6 +1132,56 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// soupx_expand_corrected_x_cpp
+NumericVector soupx_expand_corrected_x_cpp(IntegerVector p, IntegerVector row_i, NumericVector x, NumericMatrix n_soup, IntegerVector cluster_id, NumericVector cell_weights);
+RcppExport SEXP _autozyme_soupx_expand_corrected_x_cpp(SEXP pSEXP, SEXP row_iSEXP, SEXP xSEXP, SEXP n_soupSEXP, SEXP cluster_idSEXP, SEXP cell_weightsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerVector >::type p(pSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type row_i(row_iSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type n_soup(n_soupSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type cluster_id(cluster_idSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type cell_weights(cell_weightsSEXP);
+    rcpp_result_gen = Rcpp::wrap(soupx_expand_corrected_x_cpp(p, row_i, x, n_soup, cluster_id, cell_weights));
+    return rcpp_result_gen;
+END_RCPP
+}
+// soupx_cluster_soup_from_cells_cpp
+NumericMatrix soupx_cluster_soup_from_cells_cpp(IntegerVector p, IntegerVector row_i, NumericVector x, IntegerVector cluster_id, NumericVector cell_targets, NumericVector soup_frac, int n_genes, int n_clusters);
+RcppExport SEXP _autozyme_soupx_cluster_soup_from_cells_cpp(SEXP pSEXP, SEXP row_iSEXP, SEXP xSEXP, SEXP cluster_idSEXP, SEXP cell_targetsSEXP, SEXP soup_fracSEXP, SEXP n_genesSEXP, SEXP n_clustersSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerVector >::type p(pSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type row_i(row_iSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type cluster_id(cluster_idSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type cell_targets(cell_targetsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type soup_frac(soup_fracSEXP);
+    Rcpp::traits::input_parameter< int >::type n_genes(n_genesSEXP);
+    Rcpp::traits::input_parameter< int >::type n_clusters(n_clustersSEXP);
+    rcpp_result_gen = Rcpp::wrap(soupx_cluster_soup_from_cells_cpp(p, row_i, x, cluster_id, cell_targets, soup_frac, n_genes, n_clusters));
+    return rcpp_result_gen;
+END_RCPP
+}
+// soupx_adjust_counts_no_cluster_x_cpp
+NumericVector soupx_adjust_counts_no_cluster_x_cpp(IntegerVector p, IntegerVector row_i, NumericVector x, NumericVector cell_targets, NumericVector soup_frac, int n_genes);
+RcppExport SEXP _autozyme_soupx_adjust_counts_no_cluster_x_cpp(SEXP pSEXP, SEXP row_iSEXP, SEXP xSEXP, SEXP cell_targetsSEXP, SEXP soup_fracSEXP, SEXP n_genesSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerVector >::type p(pSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type row_i(row_iSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type cell_targets(cell_targetsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type soup_frac(soup_fracSEXP);
+    Rcpp::traits::input_parameter< int >::type n_genes(n_genesSEXP);
+    rcpp_result_gen = Rcpp::wrap(soupx_adjust_counts_no_cluster_x_cpp(p, row_i, x, cell_targets, soup_frac, n_genes));
+    return rcpp_result_gen;
+END_RCPP
+}
 // nb_Dd_cpp
 List nb_Dd_cpp(NumericVector y, NumericVector mu, double theta_log, NumericVector wt, int level);
 RcppExport SEXP _autozyme_nb_Dd_cpp(SEXP ySEXP, SEXP muSEXP, SEXP theta_logSEXP, SEXP wtSEXP, SEXP levelSEXP) {
@@ -1285,6 +1335,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_autozyme_az_dgc_group_summary_cpp", (DL_FUNC) &_autozyme_az_dgc_group_summary_cpp, 4},
     {"_autozyme_az_dense_group_summary_cpp", (DL_FUNC) &_autozyme_az_dense_group_summary_cpp, 5},
     {"_autozyme_zyme_soft_assignment", (DL_FUNC) &_autozyme_zyme_soft_assignment, 3},
+    {"_autozyme_soupx_expand_corrected_x_cpp", (DL_FUNC) &_autozyme_soupx_expand_corrected_x_cpp, 6},
+    {"_autozyme_soupx_cluster_soup_from_cells_cpp", (DL_FUNC) &_autozyme_soupx_cluster_soup_from_cells_cpp, 8},
+    {"_autozyme_soupx_adjust_counts_no_cluster_x_cpp", (DL_FUNC) &_autozyme_soupx_adjust_counts_no_cluster_x_cpp, 6},
     {"_autozyme_nb_Dd_cpp", (DL_FUNC) &_autozyme_nb_Dd_cpp, 5},
     {"_autozyme_nb_dDeta_log_cpp", (DL_FUNC) &_autozyme_nb_dDeta_log_cpp, 5},
     {"_autozyme_linkinv_log_cpp", (DL_FUNC) &_autozyme_linkinv_log_cpp, 1},

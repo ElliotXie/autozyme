@@ -50,6 +50,7 @@
   scriabin        = "scriabin",
   seurat          = "Seurat",
   slingshot       = "slingshot",
+  soupx           = "SoupX",
   tradeseq        = "tradeSeq",
   vegan           = "vegan",
   wgcna           = "WGCNA"
