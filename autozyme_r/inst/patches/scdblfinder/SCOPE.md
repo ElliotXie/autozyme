@@ -43,7 +43,8 @@ It is release-locked to scDblFinder 1.27.6 at upstream commit
   Error-triggered retries restore `.Random.seed` before calling upstream.
   Unsupported paths receive no speed claim.
 
-Large-tier RSS must be neutral or improved before publishing a speed claim. The
-The Mair RNA-only 29,033-cell tier exceeds the 50,000 expanded-column boundary
-and is retained as exact safety/memory evidence rather than a direct-PCA speed
-result.
+The Campbell large tier supplies exact speed evidence, but its packaged
+single-replicate peak RSS was 6.8% above the cached baseline, so it does not
+support a large-tier memory-saving claim. The Mair RNA-only 29,033-cell tier
+exceeds the 50,000 expanded-column boundary and is retained as exact
+safety/memory evidence rather than a direct-PCA speed result.
