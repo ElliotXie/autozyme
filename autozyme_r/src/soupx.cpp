@@ -72,6 +72,9 @@ NumericVector soupx_expand_corrected_x_cpp(IntegerVector p, IntegerVector row_i,
       for (int idx = 0; idx < m; ++idx) {
         sum_w += cell_weights[cells[idx]];
       }
+      if (!std::isfinite(sum_w) || sum_w <= 0.0) {
+        stop("SoupX fast expansion requires a positive finite weight sum.");
+      }
 
       std::vector<double> w(m);
       bool feasible = true;
@@ -92,39 +95,52 @@ NumericVector soupx_expand_corrected_x_cpp(IntegerVector p, IntegerVector row_i,
       std::vector<int> ord(m);
       std::iota(ord.begin(), ord.end(), 0);
       std::sort(ord.begin(), ord.end(), [&](int a, int b) {
-        return (x[entries[a]] / w[a]) < (x[entries[b]] / w[b]);
+        const double ratio_a = w[a] > 0.0 ? x[entries[a]] / w[a] : R_PosInf;
+        const double ratio_b = w[b] > 0.0 ? x[entries[b]] / w[b] : R_PosInf;
+        return ratio_a < ratio_b;
       });
 
       std::vector<char> saturated(m, 0);
-      double cw = 0.0;
-      double cy = 0.0;
+      std::vector<double> suffix_w(m + 1, 0.0);
+      for (int sorted_pos = m - 1; sorted_pos >= 0; --sorted_pos) {
+        suffix_w[sorted_pos] = suffix_w[sorted_pos + 1] + w[ord[sorted_pos]];
+      }
+      double remaining = target;
       for (int sorted_pos = 0; sorted_pos < m; ++sorted_pos) {
         const int idx = ord[sorted_pos];
-        double k = x[entries[idx]] / w[idx] * (1.0 - cw) + cy;
-        if (w[idx] == 0.0) {
-          k = R_PosInf;
+        const double active_w = suffix_w[sorted_pos];
+        if (!std::isfinite(active_w) || active_w <= 0.0) {
+          stop("SoupX fast expansion produced a non-positive active weight sum.");
         }
-        if (k <= target) {
+        const double candidate = remaining * (w[idx] / active_w);
+        if (candidate >= x[entries[idx]]) {
           saturated[idx] = 1;
+          remaining = std::max(0.0, remaining - x[entries[idx]]);
+        } else {
+          break;
         }
-        cw += w[idx];
-        cy += x[entries[idx]];
       }
 
       double sum_y_sat = 0.0;
-      double sum_w_sat = 0.0;
       for (int idx = 0; idx < m; ++idx) {
         if (saturated[idx]) {
           sum_y_sat += x[entries[idx]];
-          sum_w_sat += w[idx];
         }
       }
 
       const double resid = target - sum_y_sat;
-      const double denom = 1.0 - sum_w_sat;
+      double denom = 0.0;
+      for (int idx = 0; idx < m; ++idx) {
+        if (!saturated[idx]) {
+          denom += w[idx];
+        }
+      }
       for (int idx = 0; idx < m; ++idx) {
         double allocated = x[entries[idx]];
         if (!saturated[idx]) {
+          if (!std::isfinite(denom) || denom <= 0.0) {
+            stop("SoupX fast expansion produced a non-positive residual weight sum.");
+          }
           allocated = resid * (w[idx] / denom);
         }
         out[entries[idx]] = x[entries[idx]] - allocated;
@@ -156,7 +172,13 @@ NumericMatrix soupx_cluster_soup_from_cells_cpp(IntegerVector p, IntegerVector r
   std::vector<double> weights(n_genes);
   double weight_sum = 0.0;
   for (int gene = 0; gene < n_genes; ++gene) {
+    if (!std::isfinite(soup_frac[gene]) || soup_frac[gene] < 0.0) {
+      stop("SoupX fast subtraction requires finite non-negative soup weights.");
+    }
     weight_sum += soup_frac[gene];
+  }
+  if (!std::isfinite(weight_sum) || weight_sum <= 0.0) {
+    stop("SoupX fast subtraction requires a positive finite soup weight sum.");
   }
   std::vector<int> positive_genes;
   positive_genes.reserve(n_genes);
@@ -202,33 +224,48 @@ NumericMatrix soupx_cluster_soup_from_cells_cpp(IntegerVector p, IntegerVector r
       });
 
       std::vector<char> saturated(n_genes, 0);
-      double cw = 0.0;
-      double cy = 0.0;
+      std::vector<double> suffix_w(ord.size() + 1, 0.0);
+      for (int sorted_pos = static_cast<int>(ord.size()) - 1;
+           sorted_pos >= 0; --sorted_pos) {
+        suffix_w[sorted_pos] = suffix_w[sorted_pos + 1] + weights[ord[sorted_pos]];
+      }
+      double remaining = target;
       for (int sorted_pos = 0; sorted_pos < static_cast<int>(ord.size()); ++sorted_pos) {
         const int gene = ord[sorted_pos];
-        const double k = bucket[gene] / weights[gene] * (1.0 - cw) + cy;
-        if (k <= target) {
-          saturated[gene] = 1;
+        const double active_w = suffix_w[sorted_pos];
+        if (!std::isfinite(active_w) || active_w <= 0.0) {
+          stop("SoupX fast subtraction produced a non-positive active weight sum.");
         }
-        cw += weights[gene];
-        cy += bucket[gene];
+        const double candidate = remaining * (weights[gene] / active_w);
+        if (candidate >= bucket[gene]) {
+          saturated[gene] = 1;
+          remaining = std::max(0.0, remaining - bucket[gene]);
+        } else {
+          break;
+        }
       }
 
       double sum_y_sat = 0.0;
-      double sum_w_sat = 0.0;
       for (int gene : positive_genes) {
         if (saturated[gene]) {
           sum_y_sat += bucket[gene];
-          sum_w_sat += weights[gene];
         }
       }
 
       const double resid = target - sum_y_sat;
-      const double denom = 1.0 - sum_w_sat;
+      double denom = 0.0;
+      for (int gene : positive_genes) {
+        if (!saturated[gene]) {
+          denom += weights[gene];
+        }
+      }
       for (int gene : positive_genes) {
         if (saturated[gene]) {
           soup(gene, cl) = bucket[gene];
         } else {
+          if (!std::isfinite(denom) || denom <= 0.0) {
+            stop("SoupX fast subtraction produced a non-positive residual weight sum.");
+          }
           soup(gene, cl) = resid * (weights[gene] / denom);
         }
       }
@@ -254,7 +291,13 @@ NumericVector soupx_adjust_counts_no_cluster_x_cpp(IntegerVector p, IntegerVecto
   std::vector<double> weights(n_genes);
   double weight_sum = 0.0;
   for (int gene = 0; gene < n_genes; ++gene) {
+    if (!std::isfinite(soup_frac[gene]) || soup_frac[gene] < 0.0) {
+      stop("SoupX fast subtraction requires finite non-negative soup weights.");
+    }
     weight_sum += soup_frac[gene];
+  }
+  if (!std::isfinite(weight_sum) || weight_sum <= 0.0) {
+    stop("SoupX fast subtraction requires a positive finite soup weight sum.");
   }
   std::vector<int> positive_genes;
   positive_genes.reserve(n_genes);
@@ -297,34 +340,53 @@ NumericVector soupx_adjust_counts_no_cluster_x_cpp(IntegerVector p, IntegerVecto
       });
 
       std::vector<char> saturated(n_genes, 0);
-      double cw = 0.0;
-      double cy = 0.0;
+      std::vector<double> suffix_w(ord.size() + 1, 0.0);
+      for (int sorted_pos = static_cast<int>(ord.size()) - 1;
+           sorted_pos >= 0; --sorted_pos) {
+        suffix_w[sorted_pos] = suffix_w[sorted_pos + 1] + weights[ord[sorted_pos]];
+      }
+      double remaining = target;
       for (int sorted_pos = 0; sorted_pos < static_cast<int>(ord.size()); ++sorted_pos) {
         const int gene = ord[sorted_pos];
-        const double k = bucket[gene] / weights[gene] * (1.0 - cw) + cy;
-        if (k <= target) {
-          saturated[gene] = 1;
+        const double active_w = suffix_w[sorted_pos];
+        if (!std::isfinite(active_w) || active_w <= 0.0) {
+          stop("SoupX fast subtraction produced a non-positive active weight sum.");
         }
-        cw += weights[gene];
-        cy += bucket[gene];
+        const double candidate = remaining * (weights[gene] / active_w);
+        if (candidate >= bucket[gene]) {
+          saturated[gene] = 1;
+          remaining = std::max(0.0, remaining - bucket[gene]);
+        } else {
+          break;
+        }
       }
 
       double sum_y_sat = 0.0;
-      double sum_w_sat = 0.0;
       for (int gene : positive_genes) {
         if (saturated[gene]) {
           sum_y_sat += bucket[gene];
-          sum_w_sat += weights[gene];
         }
       }
 
       const double resid = target - sum_y_sat;
-      const double denom = 1.0 - sum_w_sat;
+      double denom = 0.0;
+      for (int gene : positive_genes) {
+        if (!saturated[gene]) {
+          denom += weights[gene];
+        }
+      }
       for (int ptr = p[cell]; ptr < p[cell + 1]; ++ptr) {
         const int gene = row_i[ptr];
         double allocated = 0.0;
         if (weights[gene] > 0.0) {
-          allocated = saturated[gene] ? bucket[gene] : resid * (weights[gene] / denom);
+          if (saturated[gene]) {
+            allocated = bucket[gene];
+          } else {
+            if (!std::isfinite(denom) || denom <= 0.0) {
+              stop("SoupX fast subtraction produced a non-positive residual weight sum.");
+            }
+            allocated = resid * (weights[gene] / denom);
+          }
         }
         out[ptr] = x[ptr] - allocated;
       }

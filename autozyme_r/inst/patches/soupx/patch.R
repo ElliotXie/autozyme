@@ -30,6 +30,31 @@ if (requireNamespace("SoupX", quietly = TRUE) &&
     length(args) == 0L
   }
 
+  .soupx_ordered_cell_weights <- function(sc) {
+    cell_names <- colnames(sc$toc)
+    metadata <- sc$metaData
+    if (is.null(rownames(metadata)) ||
+        !all(c("nUMIs", "rho") %in% colnames(metadata)) ||
+        !all(cell_names %in% rownames(metadata))) {
+      return(NULL)
+    }
+    metadata <- metadata[cell_names, c("nUMIs", "rho"), drop = FALSE]
+    as.numeric(metadata$nUMIs * metadata$rho)
+  }
+
+  .soupx_valid_fast_weights <- function(cell_weights, expected_length) {
+    length(cell_weights) == expected_length &&
+      all(is.finite(cell_weights)) &&
+      all(cell_weights > 0)
+  }
+
+  .soupx_valid_soup_profile <- function(soup_frac, expected_length) {
+    length(soup_frac) == expected_length &&
+      all(is.finite(soup_frac)) &&
+      all(soup_frac >= 0) &&
+      sum(soup_frac) > 0
+  }
+
   .soupx_positive_Tsparse_from_dgC <- function(mat) {
     keep <- mat@x > 0
     col_index <- rep.int(seq_len(ncol(mat)), diff(mat@p))
@@ -143,9 +168,11 @@ if (requireNamespace("SoupX", quietly = TRUE) &&
                                   zyme = TRUE) {
     dots <- list(...)
     if (!isTRUE(zyme) || !.soupx_no_extra_args(dots) ||
-        !inherits(cellObsCnts, "dgCMatrix")) {
+        !inherits(cellObsCnts, "dgCMatrix") ||
+        !.soupx_valid_fast_weights(cellWeights, ncol(cellObsCnts))) {
       return(.soupx_orig_expandClusters(
-        clustSoupCnts, cellObsCnts, clusters, cellWeights, verbose = verbose
+        clustSoupCnts, cellObsCnts, clusters, cellWeights, verbose = verbose,
+        ...
       ))
     }
     .soupx_expandClusters_impl(
@@ -160,7 +187,7 @@ if (requireNamespace("SoupX", quietly = TRUE) &&
                                 pCut = 0.01, ..., zyme = TRUE) {
     dots <- list(...)
     if (!isTRUE(zyme)) {
-      return(.soupx_orig_adjustCounts(
+      return(.soupx_upstream_adjustCounts(
         sc, clusters = clusters, method = method, roundToInt = roundToInt,
         verbose = verbose, tol = tol, pCut = pCut, ...
       ))
@@ -179,7 +206,7 @@ if (requireNamespace("SoupX", quietly = TRUE) &&
         !isTRUE(all.equal(tol, 1e-3)) ||
         !isTRUE(all.equal(pCut, 0.01)) ||
         !.soupx_no_extra_args(dots)) {
-      return(.soupx_orig_adjustCounts(
+      return(.soupx_upstream_adjustCounts(
         sc, clusters = clusters, method = method, roundToInt = roundToInt,
         verbose = verbose, tol = tol, pCut = pCut, ...
       ))
@@ -194,7 +221,17 @@ if (requireNamespace("SoupX", quietly = TRUE) &&
         clusters <- FALSE
       }
     } else {
-      return(.soupx_orig_adjustCounts(
+      return(.soupx_upstream_adjustCounts(
+        sc, clusters = clusters, method = method, roundToInt = roundToInt,
+        verbose = verbose, tol = tol, pCut = pCut
+      ))
+    }
+
+    cell_weights <- .soupx_ordered_cell_weights(sc)
+    soup_frac <- sc$soupProfile$est
+    if (!.soupx_valid_fast_weights(cell_weights, ncol(sc$toc)) ||
+        !.soupx_valid_soup_profile(soup_frac, nrow(sc$toc))) {
+      return(.soupx_upstream_adjustCounts(
         sc, clusters = clusters, method = method, roundToInt = roundToInt,
         verbose = verbose, tol = tol, pCut = pCut
       ))
@@ -210,10 +247,7 @@ if (requireNamespace("SoupX", quietly = TRUE) &&
 
       out <- sc$toc
       out@x <- soupx_adjust_counts_no_cluster_x_cpp(
-        out@p, out@i, out@x,
-        sc$metaData[colnames(sc$toc), "nUMIs"] *
-          sc$metaData[colnames(sc$toc), "rho"],
-        sc$soupProfile$est, nrow(sc$toc)
+        out@p, out@i, out@x, cell_weights, soup_frac, nrow(sc$toc)
       )
       return(.soupx_positive_Tsparse_from_dgC(out))
     }
@@ -234,16 +268,13 @@ if (requireNamespace("SoupX", quietly = TRUE) &&
     cluster_id <- match(clusters_ordered, cluster_levels)
     out <- soupx_cluster_soup_from_cells_cpp(
       sc$toc@p, sc$toc@i, sc$toc@x,
-      cluster_id,
-      sc$metaData[colnames(sc$toc), "nUMIs"] *
-        sc$metaData[colnames(sc$toc), "rho"],
-      sc$soupProfile$est,
+      cluster_id, cell_weights, soup_frac,
       nrow(sc$toc), length(cluster_levels)
     )
     dimnames(out) <- list(rownames(sc$toc), cluster_levels)
 
     .soupx_expandClusters_impl(out, sc$toc, clusters_ordered,
-                               sc$metaData$nUMIs * sc$metaData$rho,
+                               cell_weights,
                                verbose = verbose, corrected = TRUE)
   }
 
