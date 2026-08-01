@@ -134,6 +134,7 @@ if (requireNamespace("scDblFinder", quietly = TRUE) &&
     cls <- unname(as.character(class(x)))
     length(cls) == 1L && identical(cls[[1L]], "dgCMatrix")
   }
+  .scdblfinder_norm_max_cols <- 35000L
 
   # Forward formal promises by name.  This avoids both do.call()'s materialized
   # call and re-evaluation of user expressions from match.call().
@@ -200,11 +201,31 @@ if (requireNamespace("scDblFinder", quietly = TRUE) &&
     (serial || multicore) && workers %in% c(1L, 4L, 8L)
   }
 
-  # Keep the public driver as an unmodified upstream clone.  The accepted task
-  # pipeline also removed one post-doublet gc() call, but AST rewriting of the
-  # whole scDblFinder() body can corrupt replacement-call forms in packaged R.
-  # The release patch therefore ships only the namespace-function fast paths.
+  .scdblfinder_rewrite_sel_features <- function(fn) {
+    body_text <- paste(deparse(body(fn), width.cutoff = 500L), collapse = "\n")
+    from <- "sel_features <- selFeatures(sce[sel_features, ], cl, nfeatures = nfeatures, propMarkers = propMarkers)"
+    to <- paste(
+      "sel_features <- if (identical(sel_features, row.names(sce)))",
+      "selFeatures(sce, cl, nfeatures = nfeatures, propMarkers = propMarkers)",
+      "else selFeatures(sce[sel_features, ], cl, nfeatures = nfeatures, propMarkers = propMarkers)"
+    )
+    matches <- gregexpr(from, body_text, fixed = TRUE)[[1L]]
+    count <- if (identical(matches, -1L)) 0L else length(matches)
+    if (count == 1L) {
+      body_text <- sub(from, to, body_text, fixed = TRUE)
+      body(fn) <- parse(text = body_text, keep.source = FALSE)[[1L]]
+    }
+    list(fn = fn, count = count)
+  }
+
+  # Keep upstream gc() behavior.  The only public-driver rewrite is the exact
+  # full-row feature-selection subset bypass accepted in task best 34b1fc7.
   .driver_scDblFinder <- .orig_scDblFinder
+  .sel_features_rewrite <- .scdblfinder_rewrite_sel_features(.driver_scDblFinder)
+  if (.sel_features_rewrite$count != 1L) .scdblfinder_release_ok <- FALSE
+  if (.sel_features_rewrite$count == 1L) {
+    .driver_scDblFinder <- .sel_features_rewrite$fn
+  }
 
   # Preserve the complete upstream formal signature; the wrapper only chooses
   # between an exact upstream call and the release-locked driver clone.
@@ -244,7 +265,7 @@ if (requireNamespace("scDblFinder", quietly = TRUE) &&
     if (!.scdblfinder_context_active() || !is.null(doNorm) ||
         length(dims) != 1L || !isTRUE(as.numeric(dims) == 20) ||
         !.scdblfinder_is_exact_dgCMatrix(e) || anyNA(e@x) ||
-        ncol(e) > 50000L) {
+        ncol(e) > .scdblfinder_norm_max_cols) {
       return(fallback())
     }
     sf <- tryCatch(
@@ -265,6 +286,8 @@ if (requireNamespace("scDblFinder", quietly = TRUE) &&
       )
       if (is.list(pca)) pca <- pca$x
       row.names(pca) <- colnames(e)
+      rm(normalized)
+      invisible(gc(verbose = FALSE))
       pca
     }, error = function(err) {
       .scdblfinder_rng_restore(rng)

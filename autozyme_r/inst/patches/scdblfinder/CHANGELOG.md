@@ -15,7 +15,16 @@
 - The package release keeps upstream's `gc()` behavior; the task-level
   post-doublet `gc()` call-site rewrite was not shipped because packaged body
   rewriting corrupted upstream replacement-call forms.
-- Memory caveat: normalized sparse tiers retain the speed claim but can carry
-  a higher peak RSS than upstream, especially on large sparse inputs. The
-  near-cap Mair tier is retained as exact safety evidence and not as a speed
-  claim.
+- Lifted the `34b1fc7` memory-balance call-site rewrite: when selected
+  features already span all rows, the public driver calls `selFeatures(sce, ...)`
+  instead of constructing a redundant full-row `sce[sel_features, ]` subset.
+  The transform is exact-match and release-hash guarded.
+- Narrowed eager sparse normalization to expanded matrices at or below 35,000
+  columns after package large-tier RSS remained above its paired upstream
+  baseline; larger expanded inputs retain upstream normalization/PCA behavior
+  while the public-driver subset bypass and exact internal fast paths remain
+  guarded.
+- Memory caveat: the normalized sparse speed claim is publishable only when the
+  large tier is exact and RSS is neutral or improved. Campbell large and the
+  near-cap Mair tier are retained as exact safety evidence rather than
+  normalization speed claims.

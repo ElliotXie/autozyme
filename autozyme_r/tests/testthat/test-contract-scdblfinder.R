@@ -26,6 +26,24 @@ test_that("scdblfinder release guard covers body and formals for four targets", 
   )
 })
 
+test_that("scdblfinder public-driver rewrite is narrow and callable", {
+  .skip_if_no_exact_scdblfinder()
+  registry <- get(".zyme_registry", envir = asNamespace("autozyme"))
+  patch_env <- environment(registry[["scdblfinder"]]$targets$scDblFinder)
+  driver <- get(".driver_scDblFinder", envir = patch_env)
+  original <- get(".orig_scDblFinder", envir = patch_env)
+  rewrite <- get(".sel_features_rewrite", envir = patch_env)
+
+  expect_identical(rewrite$count, 1L)
+  expect_identical(formals(driver), formals(original))
+  expect_true(is.function(driver))
+
+  driver_body <- paste(deparse(body(driver), width.cutoff = 500L), collapse = "\n")
+  expect_match(driver_body, "identical\\(sel_features, row.names\\(sce\\)\\)")
+  expect_match(driver_body, "gc\\(verbose = FALSE\\)")
+  expect_match(driver_body, "gc\\(verbose = FALSE, full = TRUE\\)")
+})
+
 test_that("scdblfinder internal calls fall back outside public context", {
   .skip_if_no_exact_scdblfinder()
 
@@ -70,6 +88,36 @@ test_that("scdblfinder transient context is nest-safe and restored", {
   expect_true(active())
   exit(outer)
   expect_false(active())
+})
+
+test_that("scdblfinder normalization boundary falls back under public context", {
+  .skip_if_no_exact_scdblfinder()
+  registry <- get(".zyme_registry", envir = asNamespace("autozyme"))
+  patch_env <- environment(registry[["scdblfinder"]]$targets$scDblFinder)
+  enter <- get(".scdblfinder_context_enter", envir = patch_env)
+  exit <- get(".scdblfinder_context_exit", envir = patch_env)
+  max_cols <- get(".scdblfinder_norm_max_cols", envir = patch_env)
+  original_default <- get(".orig_defaultProcessing", envir = patch_env)
+  on.exit(assign(".orig_defaultProcessing", original_default, envir = patch_env),
+          add = TRUE)
+  assign(
+    ".orig_defaultProcessing",
+    function(e, dims = NULL, doNorm = NULL) {
+      list(fallback = TRUE, ncol = ncol(e), dims = dims, doNorm = doNorm)
+    },
+    envir = patch_env
+  )
+
+  x <- Matrix::sparseMatrix(
+    i = 1L, j = 1L, x = 1, dims = c(2L, max_cols + 1L)
+  )
+  old <- enter()
+  on.exit(exit(old), add = TRUE)
+  expect_identical(
+    scDblFinder:::.defaultProcessing(x, dims = 20L),
+    list(fallback = TRUE, ncol = max_cols + 1L, dims = 20L, doNorm = NULL)
+  )
+  exit(old)
 })
 
 test_that("scdblfinder guarded KNN and cxds fast paths match upstream", {
