@@ -19,9 +19,9 @@ It is release-locked to scDblFinder 1.27.6 at upstream commit
   upstream defaults.
 - **Fast path:** Four coordinated namespace targets are active only inside the
   supported public call: eager sparse normalization rewrapped as a delayed
-  matrix before unchanged PCA, incremental KNN ratio-prefix writes, omission
-  of one single-sample post-doublet `gc()`, and skipping sparse NA replacement
-  after proving the stored sparse values contain no NA.
+  matrix before unchanged PCA, incremental KNN ratio-prefix writes, and
+  skipping sparse NA replacement after proving the stored sparse values contain
+  no NA. The package release keeps upstream's `gc()` behavior.
 - **Normalization boundary:** The eager normalization path is used only when
   expanded real+artificial columns are at most 50,000 and size factors are
   positive and finite. Expanded inputs above 50,000 retain upstream raw-PCA

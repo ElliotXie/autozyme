@@ -47,6 +47,7 @@
   mast            = "MAST",
   nichenetr       = "nichenetr",
   rctd            = "spacexr",
+  scdblfinder     = "scDblFinder",
   scriabin        = "scriabin",
   seurat          = "Seurat",
   slingshot       = "slingshot",

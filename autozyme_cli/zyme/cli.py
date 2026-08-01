@@ -828,7 +828,7 @@ def build_parser():
              "shelling out to `autozyme.verify_patch()` (Python) or "
              "`autozyme::verify_patch()` (R). Spawns fresh subprocesses at "
              "5 tiers × 2 reps (auto-escalates to 3 reps if reps disagree "
-             ">20%), appends per-tier rows to package_verify.tsv. "
+             ">20%%), appends per-tier rows to package_verify.tsv. "
              "On success, merges publishable passing rows and crash/OOM "
              "sentinels into the bundled package speedups snapshot. "
              "Distinct from `zyme verify`: verify = threading robustness "

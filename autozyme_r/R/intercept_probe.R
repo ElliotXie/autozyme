@@ -57,7 +57,11 @@
   }
   entry$targets <- targets
   registry[[patch_name]] <- entry
-  assign(".zyme_registry", registry, envir = asNamespace("autozyme"))
+  ns <- asNamespace("autozyme")
+  was_locked <- bindingIsLocked(".zyme_registry", ns)
+  if (was_locked) unlockBinding(".zyme_registry", ns)
+  assign(".zyme_registry", registry, envir = ns)
+  if (was_locked) lockBinding(".zyme_registry", ns)
   invisible()
 }
 

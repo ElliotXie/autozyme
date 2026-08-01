@@ -13,6 +13,7 @@ if (requireNamespace("scDblFinder", quietly = TRUE) &&
     requireNamespace("BiocNeighbors", quietly = TRUE) &&
     requireNamespace("BiocSingular", quietly = TRUE) &&
     requireNamespace("DelayedArray", quietly = TRUE) &&
+    requireNamespace("digest", quietly = TRUE) &&
     requireNamespace("Matrix", quietly = TRUE) &&
     requireNamespace("scater", quietly = TRUE) &&
     requireNamespace("scrapper", quietly = TRUE) &&
@@ -199,29 +200,11 @@ if (requireNamespace("scDblFinder", quietly = TRUE) &&
     (serial || multicore) && workers %in% c(1L, 4L, 8L)
   }
 
-  # Replace exactly the single-sample post-doublet gc(), leaving the split
-  # sample gc(full=TRUE) untouched.  The body hash above makes this rewrite
-  # fail closed if upstream source changes.
-  .scdblfinder_rewrite_gc <- function(expr) {
-    if (identical(expr, quote(gc(verbose = FALSE)))) {
-      return(list(expr = quote(invisible(NULL)), count = 1L))
-    }
-    if (!is.call(expr)) return(list(expr = expr, count = 0L))
-    parts <- as.list(expr)
-    count <- 0L
-    for (i in seq_along(parts)) {
-      changed <- .scdblfinder_rewrite_gc(parts[[i]])
-      parts[[i]] <- changed$expr
-      count <- count + changed$count
-    }
-    list(expr = as.call(parts), count = count)
-  }
-  .gc_rewrite <- .scdblfinder_rewrite_gc(body(.orig_scDblFinder))
-  if (.gc_rewrite$count != 1L) .scdblfinder_release_ok <- FALSE
+  # Keep the public driver as an unmodified upstream clone.  The accepted task
+  # pipeline also removed one post-doublet gc() call, but AST rewriting of the
+  # whole scDblFinder() body can corrupt replacement-call forms in packaged R.
+  # The release patch therefore ships only the namespace-function fast paths.
   .driver_scDblFinder <- .orig_scDblFinder
-  if (.gc_rewrite$count == 1L) body(.driver_scDblFinder) <- .gc_rewrite$expr
-  .driver_env <- new.env(parent = .scdblfinder_ns)
-  environment(.driver_scDblFinder) <- .driver_env
 
   # Preserve the complete upstream formal signature; the wrapper only chooses
   # between an exact upstream call and the release-locked driver clone.
@@ -409,6 +392,101 @@ if (requireNamespace("scDblFinder", quietly = TRUE) &&
     })
   }
 
+  .scdblfinder_as_plain_df <- function(x) {
+    as.data.frame(x, optional = TRUE, stringsAsFactors = FALSE)
+  }
+
+  .scdblfinder_assay_contract <- function(x, fingerprint_fn) {
+    nms <- SummarizedExperiment::assayNames(x)
+    stats::setNames(lapply(nms, function(nm) {
+      assay <- SummarizedExperiment::assay(x, nm)
+      fp <- fingerprint_fn(assay)
+      list(
+        class = paste(class(assay), collapse = "|"),
+        dim = as.integer(dim(assay)),
+        fingerprint = digest::digest(list(
+          class = class(assay),
+          dim = as.integer(dim(assay)),
+          dimnames = dimnames(assay),
+          serialized_size_bytes = fp$serialized_size_bytes,
+          serialized_sha256 = fp$serialized_sha256
+        ), algo = "sha256")
+      )
+    }), nms)
+  }
+
+  .scdblfinder_extract_output <- function(input, result, contract_env) {
+    cd <- as.data.frame(SummarizedExperiment::colData(result))
+    rd <- as.data.frame(SummarizedExperiment::rowData(result))
+    input_cd <- .scdblfinder_as_plain_df(SummarizedExperiment::colData(input))
+    input_rd <- .scdblfinder_as_plain_df(SummarizedExperiment::rowData(input))
+    output_cd_all <- .scdblfinder_as_plain_df(SummarizedExperiment::colData(result))
+    output_rd_all <- .scdblfinder_as_plain_df(SummarizedExperiment::rowData(result))
+    original_cd_names <- colnames(input_cd)
+    original_rd_names <- colnames(input_rd)
+    output_original_cd <- if (all(original_cd_names %in% colnames(output_cd_all))) {
+      output_cd_all[, original_cd_names, drop = FALSE]
+    } else {
+      output_cd_all[, intersect(original_cd_names, colnames(output_cd_all)), drop = FALSE]
+    }
+    output_original_rd <- if (all(original_rd_names %in% colnames(output_rd_all))) {
+      output_rd_all[, original_rd_names, drop = FALSE]
+    } else {
+      output_rd_all[, intersect(original_rd_names, colnames(output_rd_all)), drop = FALSE]
+    }
+    scd_cd_names <- grep("^scDblFinder\\.", colnames(output_cd_all), value = TRUE)
+    scd_rd_names <- grep("^scDblFinder\\.", colnames(output_rd_all), value = TRUE)
+    scd_coldata <- output_cd_all[, scd_cd_names, drop = FALSE]
+    scd_rowdata <- output_rd_all[, scd_rd_names, drop = FALSE]
+
+    selected <- rd[["scDblFinder.selected"]]
+    if (is.null(selected)) selected <- rep(NA, nrow(result))
+    names(selected) <- rownames(result)
+
+    score <- cd[["scDblFinder.score"]]
+    names(score) <- rownames(cd)
+
+    klass <- as.character(cd[["scDblFinder.class"]])
+    names(klass) <- rownames(cd)
+
+    weighted <- cd[["scDblFinder.weighted"]]
+    if (!is.null(weighted)) names(weighted) <- rownames(cd)
+
+    cxds <- cd[["scDblFinder.cxds_score"]]
+    if (!is.null(cxds)) names(cxds) <- rownames(cd)
+
+    list(
+      cell_ids = rownames(cd),
+      feature_ids = rownames(result),
+      input_cell_ids = colnames(input),
+      input_feature_ids = rownames(input),
+      input_assays = .scdblfinder_assay_contract(
+        input, contract_env$stream_serialized_fingerprint
+      ),
+      output_assays = .scdblfinder_assay_contract(
+        result, contract_env$stream_serialized_fingerprint
+      ),
+      input_coldata = input_cd,
+      output_original_coldata = output_original_cd,
+      input_rowdata = input_rd,
+      output_original_rowdata = output_original_rd,
+      scdblfinder_coldata = scd_coldata,
+      scdblfinder_rowdata = scd_rowdata,
+      scdblfinder_col_fields = scd_cd_names,
+      scdblfinder_row_fields = scd_rd_names,
+      score = score,
+      class = klass,
+      weighted = weighted,
+      cxds_score = cxds,
+      selected_features = selected,
+      threshold = S4Vectors::metadata(result)$scDblFinder.threshold,
+      stats = S4Vectors::metadata(result)$scDblFinder.stats,
+      full_sce_contract = contract_env$full_sce_contract(result),
+      n_cells = ncol(result),
+      n_features = nrow(result)
+    )
+  }
+
   register_patch(
     name = "scdblfinder",
     upstream = "scDblFinder",
@@ -417,6 +495,49 @@ if (requireNamespace("scDblFinder", quietly = TRUE) &&
       .defaultProcessing = fast_default_processing,
       .evaluateKNN = fast_evaluate_knn,
       cxds2 = fast_cxds2
+    ),
+    smoke = list(
+      load = function(task_dir, tier) {
+        task <- yaml::read_yaml(file.path(task_dir, "task.yaml"))
+        ds <- Filter(function(d) identical(d$tier, tier), task$datasets)
+        if (length(ds) == 0L) {
+          stop("no dataset for tier '", tier, "' in task.yaml")
+        }
+        sce <- readRDS(resolve_dataset_path(task_dir, ds[[1L]]$path))
+        if (!methods::is(sce, "SingleCellExperiment")) {
+          stop("scDblFinder smoke input must be a SingleCellExperiment")
+        }
+        if (ncol(sce) > 33000L) {
+          stop("scDblFinder smoke input exceeds task max_cells=33000")
+        }
+        contract_env <- new.env(parent = globalenv())
+        sys.source(file.path(task_dir, "setup", "full_sce_contract.R"),
+                   envir = contract_env)
+        seed <- task$random_seeds$primary
+        if (is.null(seed)) seed <- 42L
+        set.seed(as.integer(seed))
+        list(sce = sce, contract_env = contract_env)
+      },
+      call = function(inputs) {
+        result <- scDblFinder::scDblFinder(
+          inputs$sce,
+          verbose = FALSE,
+          BPPARAM = BiocParallel::SerialParam(progressbar = FALSE)
+        )
+        list(
+          input = inputs$sce,
+          result = result,
+          contract_env = inputs$contract_env
+        )
+      },
+      save = function(result, dir, tier = "small", ...) {
+        output <- .scdblfinder_extract_output(
+          result$input,
+          result$result,
+          result$contract_env
+        )
+        saveRDS(output, file.path(dir, "scdblfinder_output.rds"))
+      }
     ),
     tested_against = "scDblFinder 1.27.6",
     tested_upstream_versions = list(scDblFinder = "1.27.6")
