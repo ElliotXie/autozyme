@@ -2,7 +2,7 @@
 #
 # Lifted from autozyme task `test_scdblfinder`.
 #
-# Four namespace targets are registered as one release-locked unit.  The
+# Five namespace targets are registered as one release-locked unit.  The
 # internal fast functions are active only while the patched public
 # scDblFinder() driver is servicing the attested default call.  Direct calls
 # to internals, unsupported arguments or inputs, global disablement, version
@@ -14,7 +14,9 @@ if (requireNamespace("scDblFinder", quietly = TRUE) &&
     requireNamespace("BiocSingular", quietly = TRUE) &&
     requireNamespace("DelayedArray", quietly = TRUE) &&
     requireNamespace("digest", quietly = TRUE) &&
+    requireNamespace("irlba", quietly = TRUE) &&
     requireNamespace("Matrix", quietly = TRUE) &&
+    requireNamespace("MatrixGenerics", quietly = TRUE) &&
     requireNamespace("scater", quietly = TRUE) &&
     requireNamespace("scrapper", quietly = TRUE) &&
     requireNamespace("SingleCellExperiment", quietly = TRUE) &&
@@ -32,6 +34,9 @@ if (requireNamespace("scDblFinder", quietly = TRUE) &&
   )
   .orig_evaluateKNN <- utils::getFromNamespace(".evaluateKNN", "scDblFinder")
   .orig_cxds2 <- utils::getFromNamespace("cxds2", "scDblFinder")
+  .orig_createDoublets <- utils::getFromNamespace(
+    "createDoublets", "scDblFinder"
+  )
 
   # Hash exactly the width=500 deparse used by the task's source audit.  R
   # versions without tools::sha256sum fail closed and leave upstream active.
@@ -77,13 +82,18 @@ if (requireNamespace("scDblFinder", quietly = TRUE) &&
     cxds2 = list(
       body = "684b255fce06358f39a3a82ae0283fa7e6d2867d954b51a411c0c2401898d6f7",
       formals = "f4e8f2a6ce72d8b57abbea2b8badcbf1a78ba75a75ac0adfa7089a50892e5402"
+    ),
+    createDoublets = list(
+      body = "bb327eafb80cac4e7a719988544c59b3d94212f822350f1fa8da0744eec22841",
+      formals = "67767c06ef06ccc381036b5507ca5073b31f57b43d9751f62bc07bfd92fa3bd6"
     )
   )
   .scdblfinder_actual_hashes <- list(
     scDblFinder = .scdblfinder_fn_hashes(.orig_scDblFinder),
     .defaultProcessing = .scdblfinder_fn_hashes(.orig_defaultProcessing),
     .evaluateKNN = .scdblfinder_fn_hashes(.orig_evaluateKNN),
-    cxds2 = .scdblfinder_fn_hashes(.orig_cxds2)
+    cxds2 = .scdblfinder_fn_hashes(.orig_cxds2),
+    createDoublets = .scdblfinder_fn_hashes(.orig_createDoublets)
   )
   .scdblfinder_release_ok <- identical(
     as.character(utils::packageVersion("scDblFinder")), "1.27.6"
@@ -134,7 +144,7 @@ if (requireNamespace("scDblFinder", quietly = TRUE) &&
     cls <- unname(as.character(class(x)))
     length(cls) == 1L && identical(cls[[1L]], "dgCMatrix")
   }
-  .scdblfinder_norm_max_cols <- 35000L
+  .scdblfinder_norm_max_cols <- 50000L
 
   # Forward formal promises by name.  This avoids both do.call()'s materialized
   # call and re-evaluation of user expressions from match.call().
@@ -276,19 +286,119 @@ if (requireNamespace("scDblFinder", quietly = TRUE) &&
     rng <- .scdblfinder_rng_snapshot()
     tryCatch({
       normalized <- scrapper::normalizeCounts(e, sf, delayed = FALSE)
-      normalized <- DelayedArray::DelayedArray(normalized)
-      pca <- scater::calculatePCA(
-        normalized,
-        ncomponents = dims,
-        subset_row = seq_len(nrow(normalized)),
-        ntop = nrow(normalized),
-        BSPARAM = BiocSingular::IrlbaParam()
+      MatrixGenerics::rowVars(
+        DelayedArray::DelayedArray(normalized), useNames = TRUE
       )
-      if (is.list(pca)) pca <- pca$x
+      center <- Matrix::rowMeans(normalized)
+      op <- Matrix::sparseMatrix(
+        i = integer(), j = integer(),
+        dims = c(ncol(normalized), nrow(normalized))
+      )
+      attr(op, "scdblfinder_source") <- normalized
+      sparse_centered_mult <- function(x, y) {
+        if (methods::is(x, "sparseMatrix")) {
+          source <- attr(x, "scdblfinder_source", exact = TRUE)
+          as.vector(Matrix::crossprod(source, y)) - sum(center * y)
+        } else {
+          source <- attr(y, "scdblfinder_source", exact = TRUE)
+          as.vector(source %*% x) - sum(x) * center
+        }
+      }
+      svd <- irlba::irlba(
+        op, nv = dims, nu = dims, work = dims + 7L,
+        fastpath = FALSE, mult = sparse_centered_mult
+      )
+      pca <- sweep(svd$u, 2L, svd$d, "*")
+      colnames(pca) <- sprintf("PC%i", seq_len(ncol(pca)))
       row.names(pca) <- colnames(e)
-      rm(normalized)
-      invisible(gc(verbose = FALSE))
       pca
+    }, error = function(err) {
+      .scdblfinder_rng_restore(rng)
+      fallback()
+    })
+  }
+
+  fast_createDoublets <- function(x, dbl.idx, clusters = NULL, resamp = 0.5,
+                                  halfSize = 0.5, adjustSize = FALSE,
+                                  prefix = "dbl.") {
+    fallback <- function() .scdblfinder_with_context_suspended(
+      .orig_createDoublets(
+        x, dbl.idx, clusters = clusters, resamp = resamp,
+        halfSize = halfSize, adjustSize = adjustSize, prefix = prefix
+      )
+    )
+    if (!.scdblfinder_context_active() ||
+        !.scdblfinder_is_exact_dgCMatrix(x)) {
+      return(fallback())
+    }
+    rng <- .scdblfinder_rng_snapshot()
+    tryCatch({
+      check_prop <- utils::getFromNamespace(".checkPropArg", "scDblFinder")
+      adjustSize <- check_prop(as.numeric(adjustSize), FALSE)
+      halfSize <- check_prop(as.numeric(halfSize), FALSE)
+      resamp <- check_prop(as.numeric(resamp), FALSE)
+      if (adjustSize > 1 || adjustSize < 0) {
+        stop("`adjustSize` should be a logical or a number between 0 and 1.")
+      }
+      if (halfSize > 1 || halfSize < 0) {
+        stop("`adjustSize` should be a logical or a number between 0 and 1.")
+      }
+      wAd <- sample.int(
+        nrow(dbl.idx), size = round(adjustSize * nrow(dbl.idx))
+      )
+      wNad <- setdiff(seq_len(nrow(dbl.idx)), wAd)
+      x1 <- x[, dbl.idx[wNad, 1L], drop = FALSE] +
+        x[, dbl.idx[wNad, 2L], drop = FALSE]
+      if (length(wAd) > 1L) {
+        if (is.null(clusters)) {
+          stop("If `adjustSize=TRUE`, clusters must be given.")
+        }
+        dbl.idx <- as.data.frame(dbl.idx[wAd, , drop = FALSE])
+        ls <- Matrix::colSums(x)
+        csz <- vapply(
+          split(ls, clusters), FUN = median, FUN.VALUE = numeric(1L)
+        )
+        dbl.idx$ls.ratio <- ls[dbl.idx[, 1L]] /
+          (ls[dbl.idx[, 1L]] + ls[dbl.idx[, 2L]])
+        ls1 <- csz[as.character(clusters[dbl.idx[, 1L]])]
+        ls2 <- csz[as.character(clusters[dbl.idx[, 2L]])]
+        dbl.idx$factor <- (dbl.idx$ls.ratio + ls1 / (ls1 + ls2)) / 2
+        dbl.idx$factor[dbl.idx$factor > 0.8] <- 0.8
+        dbl.idx$factor[dbl.idx$factor < 0.2] <- 0.2
+        dbl.idx$ls <- ls[dbl.idx[, 1L]] + ls[dbl.idx[, 2L]]
+        x2 <- x[, dbl.idx[, 1L]] * dbl.idx$factor +
+          x[, dbl.idx[, 2L]] * (1 - dbl.idx$factor)
+        x2 <- tryCatch(
+          x2 %*% diag(dbl.idx$ls / Matrix::colSums(x2)),
+          error = function(e) t(t(x2) / Matrix::colSums(x2))
+        )
+        x1 <- cbind(x1, x2)
+        rm(x2)
+      }
+      x <- x1
+      rm(x1)
+      if (halfSize > 0) {
+        wAd <- sample.int(
+          nrow(dbl.idx), size = ceiling(halfSize * nrow(dbl.idx))
+        )
+        if (length(wAd) > 0L) x[, wAd] <- x[, wAd] / 2
+      }
+      if (resamp > 0) {
+        if (resamp != halfSize) {
+          wAd <- sample.int(ncol(x), ceiling(resamp * ncol(x)))
+        }
+        if (length(wAd) > 0L) {
+          xr <- x[, wAd, drop = FALSE]
+          xr@x <- as.numeric(stats::rpois(length(xr@x), xr@x))
+          xr <- Matrix::drop0(xr)
+          x[, wAd] <- xr
+        }
+      } else {
+        x <- round(x)
+      }
+      x <- methods::as(x, "CsparseMatrix")
+      colnames(x) <- paste0(prefix, seq_len(ncol(x)))
+      x
     }, error = function(err) {
       .scdblfinder_rng_restore(rng)
       fallback()
@@ -517,7 +627,8 @@ if (requireNamespace("scDblFinder", quietly = TRUE) &&
       scDblFinder = fast_scDblFinder,
       .defaultProcessing = fast_default_processing,
       .evaluateKNN = fast_evaluate_knn,
-      cxds2 = fast_cxds2
+      cxds2 = fast_cxds2,
+      createDoublets = fast_createDoublets
     ),
     smoke = list(
       load = function(task_dir, tier) {

@@ -9,7 +9,7 @@
   autozyme::activate("scdblfinder")
 }
 
-test_that("scdblfinder release guard covers body and formals for four targets", {
+test_that("scdblfinder release guard covers body and formals for five targets", {
   .skip_if_no_exact_scdblfinder()
   registry <- get(".zyme_registry", envir = asNamespace("autozyme"))
   targets <- registry[["scdblfinder"]]$targets
@@ -22,7 +22,8 @@ test_that("scdblfinder release guard covers body and formals for four targets", 
   )
   expect_setequal(
     names(targets),
-    c("scDblFinder", ".defaultProcessing", ".evaluateKNN", "cxds2")
+    c("scDblFinder", ".defaultProcessing", ".evaluateKNN", "cxds2",
+      "createDoublets")
   )
 })
 
@@ -120,7 +121,7 @@ test_that("scdblfinder normalization boundary falls back under public context", 
   exit(old)
 })
 
-test_that("scdblfinder guarded KNN and cxds fast paths match upstream", {
+test_that("scdblfinder guarded internal fast paths match upstream", {
   .skip_if_no_exact_scdblfinder()
   registry <- get(".zyme_registry", envir = asNamespace("autozyme"))
   patch_env <- environment(registry[["scdblfinder"]]$targets$scDblFinder)
@@ -150,6 +151,29 @@ test_that("scdblfinder guarded KNN and cxds fast paths match upstream", {
   fast_cxds <- scDblFinder::cxds2(x)
   exit(old)
   expect_identical(fast_cxds, vanilla_cxds)
+
+  counts <- Matrix::rsparsematrix(40L, 24L, density = 0.18)
+  counts@x <- as.numeric(pmax(1L, round(abs(counts@x) * 5)))
+  pairs <- cbind(seq_len(12L), 13:24)
+  clusters <- factor(rep(letters[1:3], each = 8L))
+  set.seed(193)
+  vanilla_doublets <- autozyme::with_disabled(
+    scDblFinder::createDoublets(
+      counts, pairs, clusters = clusters,
+      adjustSize = 0.25, halfSize = 0.25, resamp = 0.25
+    )
+  )
+  vanilla_rng <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
+  set.seed(193)
+  old <- enter()
+  fast_doublets <- scDblFinder::createDoublets(
+    counts, pairs, clusters = clusters,
+    adjustSize = 0.25, halfSize = 0.25, resamp = 0.25
+  )
+  exit(old)
+  fast_rng <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
+  expect_identical(fast_doublets, vanilla_doublets)
+  expect_identical(fast_rng, vanilla_rng)
 })
 
 test_that("scdblfinder public wrapper scopes context to one supported call", {

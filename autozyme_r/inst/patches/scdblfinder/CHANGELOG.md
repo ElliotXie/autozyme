@@ -2,6 +2,17 @@
 
 ## 2026-08-01
 
+- Replaced the delayed PCA bottleneck with the numerically identical generic
+  IRLBA algorithm (`fastpath = FALSE`) operating through a non-materialized
+  sparse transpose operator, guarded to expanded matrices at or below 50,000
+  columns.
+- Added release-hash-guarded sparse Poisson resampling in `createDoublets()`;
+  zero-count entries are skipped without advancing R's RNG, preserving both
+  generated counts and `.Random.seed` exactly while avoiding a dense temporary.
+- Revalidated exact outputs on all five tiers, including the 29,033-cell Mair
+  near-cap tier, which falls back to upstream PCA above the 50,000-column
+  expanded boundary.
+
 - Added the release-locked `scdblfinder` R patch for the attested
   `scDblFinder::scDblFinder(sce, verbose = FALSE, BPPARAM =
   BiocParallel::SerialParam(progressbar = FALSE))` workflow from
