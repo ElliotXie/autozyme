@@ -12,8 +12,8 @@ scoped per-domain and CI exercises each bundle as one unit.
 Subset membership decisions (the *why* matters more than the list, since
 the list will grow):
 
-  - "scrna_core": the everyday scanpy + scvelo + sccoda trio -- AnnData
-    backbone, pulls torch (sccoda's TF) lazily. Most common combo.
+  - "scrna_core": the everyday scanpy + scvelo pair -- AnnData
+    backbone and the most common co-activation.
   - "scrna_spatial": scanpy + cell2location + squidpy_cooccurrence --
     spatial transcriptomics workflow; both cell2location and squidpy
     depend on scanpy.
@@ -29,7 +29,7 @@ subset and add an entry to CONFLICTS below.
 from __future__ import annotations
 
 SUBSETS: dict[str, list[str]] = {
-    "scrna_core":         ["scanpy", "sccoda", "scvelo"],
+    "scrna_core":         ["scanpy", "scvelo"],
     "scrna_spatial":      ["scanpy", "cell2location", "squidpy_cooccurrence"],
     "molecular_dynamics": ["mdanalysis_rmsd", "prody"],
     "climate":            ["xclim"],
@@ -57,7 +57,6 @@ UPSTREAMS: dict[str, list[str]] = {
     "prody": ["prody"],
     "sarsen": ["sarsen", "xarray_sentinel"],
     "scanpy": ["scanpy"],
-    "sccoda": ["sccoda", "tensorflow_probability"],
     "scvelo": ["scvelo"],
     "squidpy_cooccurrence": ["squidpy"],
     "statsmodels": ["statsmodels"],
@@ -69,11 +68,4 @@ UPSTREAMS: dict[str, list[str]] = {
 # `activate()` consults this and warns (does not raise) when a user lights up
 # both sides — they might still want the combo with knobs tuned manually.
 # Each entry: (frozenset of patch names, human reason).
-CONFLICTS: list[tuple[frozenset[str], str]] = [
-    (
-        frozenset({"sccoda", "xclim"}),
-        "sccoda's TensorFlow threading layer can deadlock xclim's numba "
-        "parallel JIT. Set NUMBA_NUM_THREADS=1 before importing xclim if "
-        "you need both in one process.",
-    ),
-]
+CONFLICTS: list[tuple[frozenset[str], str]] = []

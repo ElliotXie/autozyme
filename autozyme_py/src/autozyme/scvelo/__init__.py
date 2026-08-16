@@ -420,17 +420,30 @@ def _smoke_call(inputs):
     """The canonical timed call: scv.tl.recover_dynamics on a fresh copy
     of adata. We copy on every call so the baseline run can't see fit_*
     columns left behind by a prior patched run (or vice versa) and
-    short-circuit. n_jobs=1 is what the task's reference.py uses;
-    fast_get_n_jobs (when patched) re-routes it to the worker pool size.
+    short-circuit.
+
+    n_jobs is the run's thread budget (ZYME_THREADS), so the unpatched baseline
+    and the patched run use the SAME worker count. The old ``n_jobs=-1`` was
+    unfair: upstream ``get_n_jobs(-1)`` grabs ALL cores while the patch's
+    ``fast_get_n_jobs(-1)`` (correctly) caps to the budget -- so at a 1-thread
+    budget the baseline ran all-core-parallel against a serial patched run, a
+    spurious <1 "speedup" (Linux medium recorded 0.36x when a matched-n_jobs A/B
+    is ~1.5x). We read ZYME_THREADS directly and fall back to serial (1) when it
+    is absent -- NOT ``auto_threads(default=None)``, which would hardware-scale
+    to cpu_count and oversubscribe the job's allocated CPUs (16 loky workers on 4
+    cores). Passing the budget to both sides makes the measured speedup reflect
+    the numba kernels, which is the real win.
     """
     import scvelo as scv
     adata = inputs["adata"].copy()
     np.random.seed(0)
     scv.settings.verbosity = 1
+    _zt = os.environ.get("ZYME_THREADS", "").strip()
+    n_jobs = int(_zt) if (_zt.isdigit() and int(_zt) >= 1) else 1
     scv.tl.recover_dynamics(
         adata,
         var_names="velocity_genes",
-        n_jobs=-1,
+        n_jobs=n_jobs,
         show_progress_bar=False,
     )
     return adata

@@ -248,7 +248,7 @@ if (requireNamespace("slingshot",            quietly = TRUE) &&
     it <- 0
     hasConverged <- FALSE
 
-    n_workers <- min(L, max(1L, parallel::detectCores() - 1L))
+    n_workers <- min(L, max(1L, autozyme::auto_threads(cap = 16L)))
     dots <- list(...)
 
     while (!hasConverged && it < maxit) {

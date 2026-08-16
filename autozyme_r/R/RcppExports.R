@@ -41,6 +41,10 @@ fitBeta_zyme <- function(ySEXP, xSEXP, nfSEXP, alpha_hatSEXP, contrastSEXP, beta
     .Call(`_autozyme_fitBeta_zyme`, ySEXP, xSEXP, nfSEXP, alpha_hatSEXP, contrastSEXP, beta_matSEXP, lambdaSEXP, weightsSEXP, useWeightsSEXP, tolSEXP, maxitSEXP, useQRSEXP, minmuSEXP)
 }
 
+fastgam_fit <- function(Xr, Sr, offset, Y, rankS, logdetSpos, MpEff, start_llam, start_lth, nthreads = 1L) {
+    .Call(`_autozyme_fastgam_fit`, Xr, Sr, offset, Y, rankS, logdetSpos, MpEff, start_llam, start_lth, nthreads)
+}
+
 calcEsLeBatchCpp <- function(stats, selectedGenes, scoreType) {
     .Call(`_autozyme_calcEsLeBatchCpp`, stats, selectedGenes, scoreType)
 }
@@ -303,6 +307,10 @@ nb_dev_resids_cpp <- function(y, mu, wt, theta_log) {
 
 nb_ls_cpp <- function(y, w, theta_log, scale) {
     .Call(`_autozyme_nb_ls_cpp`, y, w, theta_log, scale)
+}
+
+ucell_fast_scores_dgC <- function(p, i, x, nrow, pos_list, neg_list, maxRank, w_neg, int_mat) {
+    .Call(`_autozyme_ucell_fast_scores_dgC`, p, i, x, nrow, pos_list, neg_list, maxRank, w_neg, int_mat)
 }
 
 accelerate_crossprod <- function(X) {

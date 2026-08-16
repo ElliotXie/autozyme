@@ -219,6 +219,26 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// fastgam_fit
+Rcpp::List fastgam_fit(const arma::mat& Xr, const arma::mat& Sr, const arma::vec& offset, const arma::mat& Y, double rankS, double logdetSpos, double MpEff, double start_llam, double start_lth, int nthreads);
+RcppExport SEXP _autozyme_fastgam_fit(SEXP XrSEXP, SEXP SrSEXP, SEXP offsetSEXP, SEXP YSEXP, SEXP rankSSEXP, SEXP logdetSposSEXP, SEXP MpEffSEXP, SEXP start_llamSEXP, SEXP start_lthSEXP, SEXP nthreadsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type Xr(XrSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Sr(SrSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type offset(offsetSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< double >::type rankS(rankSSEXP);
+    Rcpp::traits::input_parameter< double >::type logdetSpos(logdetSposSEXP);
+    Rcpp::traits::input_parameter< double >::type MpEff(MpEffSEXP);
+    Rcpp::traits::input_parameter< double >::type start_llam(start_llamSEXP);
+    Rcpp::traits::input_parameter< double >::type start_lth(start_lthSEXP);
+    Rcpp::traits::input_parameter< int >::type nthreads(nthreadsSEXP);
+    rcpp_result_gen = Rcpp::wrap(fastgam_fit(Xr, Sr, offset, Y, rankS, logdetSpos, MpEff, start_llam, start_lth, nthreads));
+    return rcpp_result_gen;
+END_RCPP
+}
 // calcEsLeBatchCpp
 Rcpp::List calcEsLeBatchCpp(Rcpp::NumericVector const& stats, Rcpp::List const& selectedGenes, std::string scoreType);
 RcppExport SEXP _autozyme_calcEsLeBatchCpp(SEXP statsSEXP, SEXP selectedGenesSEXP, SEXP scoreTypeSEXP) {
@@ -1201,6 +1221,25 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// ucell_fast_scores_dgC
+NumericMatrix ucell_fast_scores_dgC(IntegerVector p, IntegerVector i, NumericVector x, int nrow, List pos_list, List neg_list, int maxRank, double w_neg, int int_mat);
+RcppExport SEXP _autozyme_ucell_fast_scores_dgC(SEXP pSEXP, SEXP iSEXP, SEXP xSEXP, SEXP nrowSEXP, SEXP pos_listSEXP, SEXP neg_listSEXP, SEXP maxRankSEXP, SEXP w_negSEXP, SEXP int_matSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerVector >::type p(pSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type i(iSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< int >::type nrow(nrowSEXP);
+    Rcpp::traits::input_parameter< List >::type pos_list(pos_listSEXP);
+    Rcpp::traits::input_parameter< List >::type neg_list(neg_listSEXP);
+    Rcpp::traits::input_parameter< int >::type maxRank(maxRankSEXP);
+    Rcpp::traits::input_parameter< double >::type w_neg(w_negSEXP);
+    Rcpp::traits::input_parameter< int >::type int_mat(int_matSEXP);
+    rcpp_result_gen = Rcpp::wrap(ucell_fast_scores_dgC(p, i, x, nrow, pos_list, neg_list, maxRank, w_neg, int_mat));
+    return rcpp_result_gen;
+END_RCPP
+}
 // accelerate_crossprod
 NumericMatrix accelerate_crossprod(NumericMatrix X);
 RcppExport SEXP _autozyme_accelerate_crossprod(SEXP XSEXP) {
@@ -1224,6 +1263,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_autozyme_fitDisp_zyme", (DL_FUNC) &_autozyme_fitDisp_zyme, 15},
     {"_autozyme_row_trimmed_means", (DL_FUNC) &_autozyme_row_trimmed_means, 3},
     {"_autozyme_fitBeta_zyme", (DL_FUNC) &_autozyme_fitBeta_zyme, 13},
+    {"_autozyme_fastgam_fit", (DL_FUNC) &_autozyme_fastgam_fit, 10},
     {"_autozyme_calcEsLeBatchCpp", (DL_FUNC) &_autozyme_calcEsLeBatchCpp, 3},
     {"_autozyme_fastFgseaMultilevelBatchCpp", (DL_FUNC) &_autozyme_fastFgseaMultilevelBatchCpp, 8},
     {"_autozyme_count_sum_by_group_dgc", (DL_FUNC) &_autozyme_count_sum_by_group_dgc, 3},
@@ -1290,6 +1330,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_autozyme_linkinv_log_cpp", (DL_FUNC) &_autozyme_linkinv_log_cpp, 1},
     {"_autozyme_nb_dev_resids_cpp", (DL_FUNC) &_autozyme_nb_dev_resids_cpp, 4},
     {"_autozyme_nb_ls_cpp", (DL_FUNC) &_autozyme_nb_ls_cpp, 4},
+    {"_autozyme_ucell_fast_scores_dgC", (DL_FUNC) &_autozyme_ucell_fast_scores_dgC, 9},
     {"_autozyme_accelerate_crossprod", (DL_FUNC) &_autozyme_accelerate_crossprod, 1},
     {NULL, NULL, 0}
 };

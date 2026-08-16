@@ -30,7 +30,7 @@ from autozyme._utils import resolve_dataset_path
 from autozyme._verify import verify_patch
 from autozyme._speedups import speedups
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 __all__ = [
     "__version__",
     "activate",

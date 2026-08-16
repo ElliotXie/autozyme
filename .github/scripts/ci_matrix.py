@@ -51,7 +51,6 @@ PLUGIN_TASK_DIR: dict[str, str] = {
     "obspy":                 "optimized_task/test_non_bio/test_obspy",
     "prody":                 "optimized_task/test_general_bio/test_prody",
     "sarsen":                "optimized_task/test_non_bio/test_sarsen",
-    "sccoda":                "optimized_task/test_core_singlecell/test_sccoda",
     "scvelo":                "optimized_task/test_core_singlecell/test_scvelo_recover_dynamics",
     "squidpy_cooccurrence":  "optimized_task/test_general_bio/test_squidpy_cooccurrence",
     "statsmodels":           "optimized_task/test_non_bio/test_statsmodels",
@@ -74,6 +73,7 @@ PLUGIN_TASK_DIR: dict[str, str] = {
     "seurat":                "optimized_task/test_seurat_scanpy/find_all_markers/v3",
     "slingshot":             "optimized_task/test_core_singlecell/test_slingshot",
     "tradeseq":              "optimized_task/test_core_singlecell/test_tradeseq_fitgam",
+    "ucell":                 "optimized_task/test_general_bio/test_ucell",
     "vegan":                 "optimized_task/test_general_bio/test_vegan_adonis2",
     "wgcna":                 "optimized_task/test_general_bio/test_wgcna_blockwise_real",
 }

@@ -71,9 +71,7 @@ if (requireNamespace("vegan",        quietly = TRUE) &&
   .resolve_zyme_threads <- function(parallel_arg = NULL) {
     if (inherits(parallel_arg, "cluster"))
       return(parallel_arg)
-    default <- parallel::detectCores(logical = FALSE)
-    if (is.na(default) || default < 1L)
-      default <- parallel::detectCores(logical = TRUE)
+    default <- autozyme::auto_threads(cap = 16L)
     if (is.na(default) || default < 1L)
       default <- 1L
     if (!is.null(parallel_arg)) {
@@ -469,8 +467,16 @@ if (requireNamespace("vegan",        quietly = TRUE) &&
           if (exists("meta", envir = globalenv(), inherits = FALSE))
             rm("meta", envir = globalenv())
         }, add = TRUE)
+        # Baseline-fairness: engage adonis2's native `parallel` from ZYME_THREADS
+        # (mirrors reference.R). Disabled patch -> stock adonis2 runs parallel=N;
+        # enabled patch -> fast_adonis2 resolves the same N. Without this the smoke
+        # baseline is serial and the package speedup divides an optimized parallel
+        # patch by a serial baseline (inflated). ZYME_THREADS unset -> 1 (serial).
+        .n_threads <- suppressWarnings(as.integer(Sys.getenv("ZYME_THREADS", "1")))
+        if (is.na(.n_threads) || .n_threads < 1L) .n_threads <- 1L
         vegan::adonis2(dist_mat ~ group + x, data = meta,
-                       permutations = inputs$perms, by = "terms")
+                       permutations = inputs$perms, by = "terms",
+                       parallel = .n_threads)
       },
       save = function(result, dir, tier = "tiny", ...) {
         # evaluate.R reads pipeline/adonis2.rds — mirror reference.R's keys
